@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build & Distribution Artifacts
+dist/
+release/
+*.tmp
+
+# Compiler / Intermediate Objects
+*.obj
+*.exp
+*.lib
+*.pdb
+*.idb
+*.tlog
+*.lastbuildstate
+
+# IDE / Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS Generated
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

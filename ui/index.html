@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FramePacer - Universal Presentation Frame Pacer</title>
+  <meta name="description" content="Universal Graphics API Display Frame Pacer for DirectX 11, DirectX 12, and Vulkan. Eliminates micro-stutter with sub-millisecond presentation-edge timing.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="window-frame">
+    <!-- Top Dedicated Window Titlebar (AntiRecAI Style) -->
+    <div class="window-titlebar">
+    <div class="titlebar-left">
+      <div class="titlebar-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+        </svg>
+      </div>
+      <span class="titlebar-text">FramePacer <span class="titlebar-badge">PRO v1.0</span></span>
+    </div>
+
+    <div class="titlebar-center">
+      <span class="titlebar-hint"><kbd>Insert</kbd> Toggle Menu</span>
+    </div>
+
+    <div class="titlebar-right">
+      <button class="titlebar-btn" id="btn-pin" title="Pin / Always On Top (Over Fullscreen/Borderless Games)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="17" x2="12" y2="22"></line>
+          <path d="M5 17h14l-2-7V4h1V2H6v2h1v6l-2 7z"></path>
+        </svg>
+      </button>
+      <button class="titlebar-btn" id="btn-switch-process" title="Cycle Game Telemetry Preview">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+      </button>
+      <button class="titlebar-btn" id="btn-settings" title="Engine Settings">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
+      <button class="titlebar-btn" id="btn-mini-mode" title="Toggle Mini Mode (Compact View)">
+        <svg id="icon-mini-mode" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="18 15 12 9 6 15"></polyline>
+        </svg>
+      </button>
+      <div class="titlebar-divider"></div>
+      <button class="titlebar-btn" id="btn-minimize" title="Minimize to Tray (Under ^)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      </button>
+      <button class="titlebar-btn titlebar-btn-close" id="btn-close" title="Hide to Tray (Press Insert to restore)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Mini Mode Compact View (Image 1 Cyberpunk Widget) -->
+  <div class="mini-container" id="mini-container">
+    <!-- Top Row: Process Hook Pill + Target FPS Cap Box -->
+    <div class="mini-top-row">
+      <div class="mini-process-pill waiting" id="mini-process-pill" title="Waiting for game...">
+        <div class="status-dot"></div>
+        <span class="mini-process-name" id="mini-process-name">Waiting for game...</span>
+      </div>
+
+      <div class="mini-cap-box" id="mini-cap-box" title="Target FPS Limit">
+        <span class="mini-cap-val" id="mini-fps-val">60</span>
+      </div>
+    </div>
+
+    <!-- Bottom Card: Live Metrics + Oscilloscope -->
+    <div class="mini-graph-card">
+      <div class="mini-metrics-header">
+        <span>FPS: <strong id="mini-stat-fps">60.0</strong></span>
+        <span class="mini-metric-sep">/</span>
+        <span>FT: <strong id="mini-stat-ft">16.67</strong> ms</span>
+        <span class="mini-metric-sep">/</span>
+        <span>JITTER: <strong id="mini-stat-jitter">&plusmn;0.00 ms</strong></span>
+        <span class="mini-metric-sep">/</span>
+        <span>API: <strong id="mini-stat-api">Standby</strong></span>
+      </div>
+
+      <div class="mini-oscilloscope-wrapper">
+        <canvas id="mini-frametime-canvas" class="mini-oscilloscope-canvas"></canvas>
+        <div class="mini-oscilloscope-footer">
+          <span>Buffer: 180 Frames (DXGI Presentation Edge)</span>
+          <span id="mini-footer-ft">16.67 ms / frame</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-container">
+    
+    <!-- Top Hero Header -->
+    <header class="app-header">
+      <div class="brand-section">
+        <div class="brand-logo" id="brand-logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+        </div>
+        <div class="brand-title">
+          <h1>FramePacer <span class="version-tag">PRO v1.0</span></h1>
+          <span class="brand-subtitle">Universal Presentation Frame Pacer & Jitter Eliminator</span>
+        </div>
+      </div>
+
+      <!-- Process Hook Badge & Switcher -->
+      <div class="hook-status-badge waiting" id="hook-status-badge" title="Active Game Process Hook">
+        <div class="status-dot"></div>
+        <span><strong id="process-name">Waiting for game...</strong> (<span id="process-api">Standby</span>)</span>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="tabs-header">
+      <button class="tab-btn active" data-tab="pacer">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+        </svg>
+        Pacer Dashboard
+      </button>
+      <button class="tab-btn" data-tab="engine">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+          <line x1="8" y1="21" x2="16" y2="21"></line>
+          <line x1="12" y1="17" x2="12" y2="21"></line>
+        </svg>
+        Graphics & Engine
+      </button>
+      <button class="tab-btn" data-tab="overlay">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="9" y1="3" x2="9" y2="21"></line>
+        </svg>
+        HUD & Hotkeys
+      </button>
+      <button class="tab-btn" data-tab="about">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="16" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
+        Architecture & Safety
+      </button>
+    </nav>
+
+    <!-- TAB 1: PACER DASHBOARD -->
+    <main class="dashboard-grid tab-pane" id="tab-pacer">
+      
+      <!-- Left Column: Oscilloscope & Telemetry -->
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+            </svg>
+            Live Presentation Oscilloscope
+          </div>
+          <div class="cadence-badge" id="cadence-status">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Cadence: Flat (Perfect Lock)
+          </div>
+        </div>
+
+        <!-- Telemetry Numbers -->
+        <div class="telemetry-hero">
+          <div class="metric-box">
+            <div class="metric-label">Framerate</div>
+            <div class="metric-value highlight-cyan" id="metric-fps">60.0 FPS</div>
+            <div class="metric-subtext">Rolling Avg</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Frametime</div>
+            <div class="metric-value highlight-emerald" id="metric-frametime">16.67 ms</div>
+            <div class="metric-subtext">Interval</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Jitter (σ)</div>
+            <div class="metric-value" id="metric-jitter">±32 µs</div>
+            <div class="metric-subtext">Std-Dev</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">1% Low</div>
+            <div class="metric-value" id="metric-1low">59.8 FPS</div>
+            <div class="metric-subtext">Consistency</div>
+          </div>
+        </div>
+
+        <!-- Oscilloscope Canvas -->
+        <div class="oscilloscope-wrapper">
+          <canvas id="frametime-canvas" class="oscilloscope-canvas"></canvas>
+          <div class="oscilloscope-footer">
+            <span>Buffer: 180 Frames (DXGI Presentation Edge)</span>
+            <span id="target-frametime-label">16.67 ms / frame</span>
+          </div>
+        </div>
+
+        <!-- Master Pacer Toggle Row -->
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+              </svg>
+              Presentation Frame Pacer Active
+            </div>
+            <div class="toggle-desc">Applies microsecond hybrid spin-wait prior to Present()</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="toggle-master-pacer" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+      </section>
+
+      <!-- Right Column: Pacing Presets & Controls -->
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="6" width="20" height="12" rx="2"></rect>
+              <circle cx="12" cy="12" r="2"></circle>
+              <path d="M6 12h.01M18 12h.01"></path>
+            </svg>
+            One-Click Pacing Presets
+          </div>
+        </div>
+
+        <!-- Presets Grid -->
+        <div class="presets-grid">
+          <button class="preset-btn" data-fps="30">
+            <span class="preset-fps">30</span>
+            <span class="preset-ms">33.33 ms</span>
+            <span class="preset-title">Console Flat</span>
+          </button>
+
+          <button class="preset-btn" data-fps="40">
+            <span class="preset-fps">40</span>
+            <span class="preset-ms">25.00 ms</span>
+            <span class="preset-title">Handheld 120Hz</span>
+          </button>
+
+          <button class="preset-btn active" data-fps="60">
+            <span class="preset-fps">60</span>
+            <span class="preset-ms">16.67 ms</span>
+            <span class="preset-title">Smooth Lock</span>
+          </button>
+
+          <button class="preset-btn" data-fps="90">
+            <span class="preset-fps">90</span>
+            <span class="preset-ms">11.11 ms</span>
+            <span class="preset-title">Balanced High</span>
+          </button>
+
+          <button class="preset-btn" data-fps="120">
+            <span class="preset-fps">120</span>
+            <span class="preset-ms">8.33 ms</span>
+            <span class="preset-title">120Hz Ultra</span>
+          </button>
+
+          <button class="preset-btn" data-fps="141">
+            <span class="preset-fps">141</span>
+            <span class="preset-ms">7.09 ms</span>
+            <span class="preset-title">VRR G-Sync Max</span>
+          </button>
+        </div>
+
+        <!-- Custom Slider Group -->
+        <div class="slider-control-group">
+          <div class="slider-header">
+            <span class="slider-title">Custom Framerate Cap</span>
+            <div class="slider-numeric-input">
+              <input type="number" id="fps-input" class="fps-input-box" value="60" min="10" max="360" step="1">
+              <span class="fps-unit">FPS</span>
+            </div>
+          </div>
+          <div class="range-slider-wrapper">
+            <input type="range" id="fps-slider" min="10" max="240" step="1" value="60">
+          </div>
+        </div>
+
+        <!-- Queue Latency Clamping -->
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="20" x2="18" y2="10"></line>
+                <line x1="12" y1="20" x2="12" y2="4"></line>
+                <line x1="6" y1="20" x2="6" y2="14"></line>
+              </svg>
+              Queue Depth Latency Clamp
+            </div>
+            <div class="toggle-desc">Enforces SetMaximumFrameLatency(1) to kill input lag</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="toggle-queue-clamp" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="action-btn-group">
+          <button class="btn-primary" id="btn-save-preset">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+              <polyline points="17 21 17 13 7 13 7 21"></polyline>
+              <polyline points="7 3 7 8 15 8"></polyline>
+            </svg>
+            Save Game Profile
+          </button>
+          <button class="btn-secondary" id="btn-calibrate-vrr">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 14 14"></polyline>
+            </svg>
+            Auto VRR Sync
+          </button>
+        </div>
+
+      </section>
+    </main>
+
+    <!-- TAB 2: GRAPHICS & ENGINE SETTINGS -->
+    <main class="dashboard-grid tab-pane" id="tab-engine" style="display: none;">
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+            </svg>
+            Graphics API Hook Configuration
+          </div>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="22" y1="12" x2="18" y2="12"></line>
+                <line x1="6" y1="12" x2="2" y2="12"></line>
+                <line x1="12" y1="6" x2="12" y2="2"></line>
+                <line x1="12" y1="22" x2="12" y2="18"></line>
+              </svg>
+              Auto-Attach to Foreground Games
+            </div>
+            <div class="toggle-desc">Automatically hooks 3D games as soon as they launch (Zero typing required)</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="toggle-auto-attach" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-title">DirectX 11 & DirectX 12 (DXGI Hook)</div>
+            <div class="toggle-desc">Hooks IDXGISwapChain::Present and Present1 via presentation proxy</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="toggle-hook-dx" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <div class="toggle-row" style="opacity: 0.8;">
+          <div class="toggle-info">
+            <div class="toggle-title" style="display: flex; align-items: center; gap: 8px;">
+              Vulkan Presentation Engine
+              <span style="font-size: 0.65rem; background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); padding: 2px 6px; border-radius: 4px; font-weight: 700; letter-spacing: 0.5px;">COMING SOON</span>
+            </div>
+            <div class="toggle-desc">In-process vkQueuePresentKHR presentation timing (in active roadmap)</div>
+          </div>
+          <label class="switch" style="opacity: 0.5; pointer-events: none;" title="Coming Soon">
+            <input type="checkbox" id="toggle-hook-vk" disabled>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-title">OpenGL Interceptor (wglSwapBuffers)</div>
+            <div class="toggle-desc">For classic OpenGL and emulator window backbuffers</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="toggle-hook-gl">
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            High-Resolution Timing Engine
+          </div>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-title">Hybrid Waitable Timer (High Precision)</div>
+            <div class="toggle-desc">CreateWaitableTimerExW (High-Res) + QPC _mm_pause() spin-wait</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="toggle-timing-hybrid" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-title">Variable Refresh Rate (VRR) Adaptive Guard</div>
+            <div class="toggle-desc">Prevents tripping monitor VSync buffer at upper refresh threshold</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="toggle-vrr-mode" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+      </section>
+    </main>
+
+    <!-- TAB 3: HUD & HOTKEYS -->
+    <main class="dashboard-grid tab-pane" id="tab-overlay" style="display: none;">
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+            </svg>
+            In-Game HUD Overlay Preview & Positioning
+          </div>
+        </div>
+
+        <!-- HUD Screen Simulation Preview -->
+        <div class="hud-preview-screen">
+          <div class="hud-preview-crosshair"></div>
+          <div class="hud-preview-badge pos-top-left" id="hud-preview-badge">
+            <div class="hud-row" style="justify-content: space-between;">
+              <span style="color: var(--cyan-accent); font-weight: 700;">FRAMEPACER</span>
+              <span class="hud-val-green" id="hud-pacer-status">[LOCKED]</span>
+            </div>
+            <div class="hud-metrics-row">
+              <div class="hud-metric-col">
+                <span class="hud-val-cyan" id="hud-fps-val">60.0 FPS</span>
+                <span class="hud-val-green" id="hud-ms-val">16.67 ms</span>
+                <span class="hud-val-dim" id="hud-jitter-val">JIT: +/-12 us</span>
+              </div>
+              <div class="hud-sparkline-box">
+                <div class="hud-sparkline-line"></div>
+              </div>
+            </div>
+          </div>
+          <span class="hud-surface-watermark">Simulated 3D Game Surface (Click buttons below to reposition)</span>
+        </div>
+
+        <!-- Position Placement Buttons -->
+        <div class="action-btn-group" style="margin-top: 8px;">
+          <button class="btn-secondary hud-pos-btn active" data-pos="top-left">Top-Left</button>
+          <button class="btn-secondary hud-pos-btn" data-pos="top-right">Top-Right</button>
+          <button class="btn-secondary hud-pos-btn" data-pos="bottom-left">Bottom-Left</button>
+          <button class="btn-secondary hud-pos-btn" data-pos="bottom-right">Bottom-Right</button>
+        </div>
+
+        <div class="toggle-row" style="margin-top: 10px;">
+          <div class="toggle-info">
+            <div class="toggle-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+              Enable In-Game HUD Overlay
+            </div>
+            <div class="toggle-desc">Transparent hardware-accelerated click-through window (0% Steam/EAC hook collisions)</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="toggle-overlay" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+      </section>
+
+      <!-- Right Column: Live HUD Engine & Hotkeys -->
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+            </svg>
+            Active Hotkeys & Engine Telemetry
+          </div>
+        </div>
+
+        <!-- Live Overlay Engine Status -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+          <div class="metric-box">
+            <span class="metric-label">Target Process</span>
+            <span class="metric-value highlight-cyan" id="hud-target-proc" style="font-size: 1.0rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Standby</span>
+            <span class="metric-subtext" id="hud-target-pid">No game hooked</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">HUD Placement</span>
+            <span class="metric-value highlight-emerald" id="hud-active-pos-label" style="font-size: 1.0rem;">Top-Left</span>
+            <span class="metric-subtext">Auto-tracks window</span>
+          </div>
+        </div>
+
+        <!-- Hotkeys List -->
+        <div class="toggle-row" style="margin-bottom: 6px;">
+          <div class="toggle-info">
+            <div class="toggle-title">Toggle HUD Overlay Visibility</div>
+            <div class="toggle-desc">Show / Hide HUD in real-time</div>
+          </div>
+          <code style="font-family: var(--font-mono); color: var(--cyan-accent); font-weight: 700; background: rgba(56,189,248,0.1); padding: 4px 8px; border-radius: 4px;">F11 / Ctrl + Shift + O</code>
+        </div>
+
+        <div class="toggle-row" style="margin-bottom: 6px;">
+          <div class="toggle-info">
+            <div class="toggle-title">Toggle Frame Pacer Active</div>
+            <div class="toggle-desc">Switch between locked pacing & raw pass</div>
+          </div>
+          <code style="font-family: var(--font-mono); color: var(--cyan-accent); font-weight: 700; background: rgba(56,189,248,0.1); padding: 4px 8px; border-radius: 4px;">Ctrl + Shift + P</code>
+        </div>
+
+        <div class="toggle-row" style="margin-bottom: 6px;">
+          <div class="toggle-info">
+            <div class="toggle-title">Adjust Target FPS (±1 FPS)</div>
+            <div class="toggle-desc">Fine-tune framerate cap mid-game</div>
+          </div>
+          <code style="font-family: var(--font-mono); color: var(--emerald-accent); font-weight: 700; background: rgba(16,185,129,0.1); padding: 4px 8px; border-radius: 4px;">Ctrl + Shift + ↑ / ↓</code>
+        </div>
+      </section>
+    </main>
+
+    <!-- TAB 4: ARCHITECTURE & SAFETY -->
+    <main class="dashboard-grid tab-pane" id="tab-about" style="display: none;">
+      <section class="card" style="grid-column: span 2;">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+            Scope & Anti-Cheat Safety Guidelines
+          </div>
+        </div>
+
+        <div style="font-size: 0.85rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 12px; line-height: 1.6;">
+          <p>
+            <strong style="color: var(--text-main);">Target Use Case:</strong> FramePacer is engineered specifically for single-player games, emulators, retro titles, and pairing with display frame generation tools (e.g. Lossless Scaling / LSFG).
+          </p>
+          <p>
+            <strong style="color: #fbbf24;">⚠️ Anti-Cheat Warning:</strong> Presentation table hooks and DLL injection will be flagged by kernel-level anti-cheat software (such as Easy Anti-Cheat, BattlEye, Riot Vanguard, or Ricochet). FramePacer automatically excludes known multiplayer titles to protect your account.
+          </p>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 8px;">
+            <div class="metric-box">
+              <strong style="color: var(--cyan-accent);">DirectX 11 / 12</strong>
+              <span style="font-size: 0.72rem;">dxgi.dll VTable Hook with Latency Clamping</span>
+            </div>
+            <div class="metric-box">
+              <strong style="color: #fbbf24;">Vulkan Native <span style="font-size: 0.65rem; font-weight: 400; opacity: 0.85;">(Coming Soon)</span></strong>
+              <span style="font-size: 0.72rem;">Roadmap &bull; vkQueuePresentKHR Pacing Engine</span>
+            </div>
+            <div class="metric-box">
+              <strong style="color: var(--purple-accent);">Hybrid Spin-Wait</strong>
+              <span style="font-size: 0.72rem;">High-res timer + QPC sub-millisecond precision</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+  </div>
+  </div>
+
+  <script src="js/oscilloscope.js"></script>
+  <script src="js/ipc_bridge.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

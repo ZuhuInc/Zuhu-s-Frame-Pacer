@@ -1,0 +1,60 @@
+{
+  "name": "framepacer",
+  "version": "1.0.0",
+  "description": "Universal Graphics API Display Frame Pacer & Jitter Eliminator",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "compile:cpp": "build.bat",
+    "package": "node -e \"const mod = require('png-to-ico'); const fn = mod.default || mod; const fs = require('fs'); fn('assets/framepacer-logo.png').then(buf => fs.writeFileSync('assets/icon.ico', buf));\" && electron-packager . FramePacer --platform=win32 --arch=x64 --out=release --overwrite --icon=assets/icon.ico --extra-resource=bin",
+    "build:exe": "npm run compile:cpp && npm run package"
+  },
+  "build": {
+    "appId": "com.framepacer.app",
+    "productName": "FramePacer",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "ui/**/*",
+      "assets/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "bin",
+        "to": "bin",
+        "filter": [
+          "*.exe",
+          "*.dll"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "icon": "assets/framepacer-logo.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "portable": {
+      "artifactName": "FramePacer-Portable.exe"
+    }
+  },
+  "keywords": [],
+  "author": "FramePacer Team",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@electron/packager": "^20.3.0",
+    "electron": "^44.4.1",
+    "electron-builder": "^26.7.0",
+    "png-to-ico": "^3.0.2"
+  }
+}
