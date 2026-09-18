@@ -4,8 +4,10 @@ package-lock.json
 
 # Build & Distribution Artifacts
 dist/
+dist_portable/
 release/
 *.tmp
+*.7z
 
 # Compiler / Intermediate Objects
 *.obj

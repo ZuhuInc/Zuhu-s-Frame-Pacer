@@ -1,4 +1,4 @@
-﻿# FramePacer
+# FramePacer
 
 <div align="center">
   <img src="assets/framepacer-logo.png" alt="FramePacer Logo" width="128" height="128">
@@ -80,15 +80,16 @@ npm start
 
 ---
 
-## Building Standalone Executable (.exe)
+## 📦 Building Standalone Executable (.exe)
 
-To generate a standalone portable distribution of FramePacer:
+To generate a standalone single-file portable distribution of FramePacer:
 
-1. Double-click **Build_Executable.bat** (or run `npm run build:exe`).
-2. Your packaged build will be generated in:
+1. Double-click **`Build_Executable.bat`** (or run `npm run build:exe`).
+2. Your single-file executable will be generated at:
    ```text
-   release/FramePacer-win32-x64/FramePacer.exe
+   dist/FramePacer-Portable.exe
    ```
+   *(You can copy this single `.exe` file to any folder or computer and run it directly without needing any extra folders or installations!)*
 
 ---
 
