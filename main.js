@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut, Tray, Menu, ipcMain, nativeImage, dialog } = require('electron');
+const { app, BrowserWindow, globalShortcut, Tray, Menu, ipcMain, nativeImage, dialog, screen } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -260,6 +260,79 @@ function createWindow() {
       console.error('[App] Failed to load profiles:', e);
     }
     return null;
+  });
+
+  // Display & Refresh Rate Telemetry IPC
+  const formatDisplayData = (disp, index, isPrimary) => {
+    const hz = disp.displayFrequency || 60;
+    let vrrCap;
+    if (hz >= 200) {
+      vrrCap = Math.floor(hz - 4);
+    } else if (hz >= 100) {
+      vrrCap = Math.floor(hz - 3);
+    } else {
+      vrrCap = Math.floor(hz - 2);
+    }
+
+    return {
+      id: disp.id,
+      index: index,
+      name: disp.label || (isPrimary ? 'Primary Display (UltraGear/Gaming Display)' : `Display ${index + 1}`),
+      width: disp.bounds.width,
+      height: disp.bounds.height,
+      resolution: `${disp.bounds.width}x${disp.bounds.height}`,
+      refreshRate: hz,
+      isPrimary: isPrimary,
+      vrrCap: vrrCap,
+      halfRate: Math.round(hz / 2),
+      thirdRate: Math.round(hz / 3)
+    };
+  };
+
+  ipcMain.handle('get-display-info', () => {
+    try {
+      const primary = screen.getPrimaryDisplay();
+      const all = screen.getAllDisplays();
+      const primaryData = formatDisplayData(primary, 0, true);
+      const allData = all.map((d, i) => formatDisplayData(d, i, d.id === primary.id));
+      return {
+        primary: primaryData,
+        displays: allData
+      };
+    } catch (e) {
+      console.error('[App] Failed to get display info:', e);
+      return {
+        primary: {
+          id: 1,
+          index: 0,
+          name: 'Primary Gaming Display',
+          width: 1920,
+          height: 1080,
+          resolution: '1920x1080',
+          refreshRate: 144,
+          isPrimary: true,
+          vrrCap: 141,
+          halfRate: 72,
+          thirdRate: 48
+        },
+        displays: []
+      };
+    }
+  });
+
+  screen.on('display-metrics-changed', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      try {
+        const primary = screen.getPrimaryDisplay();
+        const all = screen.getAllDisplays();
+        const primaryData = formatDisplayData(primary, 0, true);
+        const allData = all.map((d, i) => formatDisplayData(d, i, d.id === primary.id));
+        mainWindow.webContents.send('display-changed', {
+          primary: primaryData,
+          displays: allData
+        });
+      } catch (e) {}
+    }
   });
 }
 

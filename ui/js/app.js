@@ -697,11 +697,144 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // =========================================================================
+  // Display & Adaptive-Sync / VRR Engine
+  // =========================================================================
+  class DisplayManager {
+    constructor() {
+      this.currentDisplay = {
+        name: 'Primary Gaming Display',
+        resolution: '1920x1080',
+        refreshRate: 144,
+        vrrCap: 141,
+        halfRate: 72,
+        thirdRate: 48
+      };
+
+      this.displayNameLabel = document.getElementById('display-name-label');
+      this.displayResolutionLabel = document.getElementById('display-resolution-label');
+      this.displayHzVal = document.getElementById('display-hz-val');
+      this.displayVrrCapVal = document.getElementById('display-vrr-cap-val');
+      this.labelHalfRate = document.getElementById('label-half-rate');
+      this.labelThirdRate = document.getElementById('label-third-rate');
+      this.btnCalibrateVrr = document.getElementById('btn-calibrate-vrr');
+      this.btnApplyVrrSync = document.getElementById('btn-apply-vrr-sync');
+      this.btnLockHalfVrr = document.getElementById('btn-lock-half-vrr');
+      this.btnLockThirdVrr = document.getElementById('btn-lock-third-vrr');
+
+      this.init();
+    }
+
+    async init() {
+      if (window.electronAPI?.getDisplayInfo) {
+        try {
+          const info = await window.electronAPI.getDisplayInfo();
+          if (info && info.primary) {
+            this.updateDisplayData(info.primary);
+          }
+        } catch (e) {
+          console.error('[DisplayManager] Failed to get display info:', e);
+        }
+
+        window.electronAPI.onDisplayChanged?.((info) => {
+          if (info && info.primary) {
+            this.updateDisplayData(info.primary);
+          }
+        });
+      } else {
+        // Fallback for browser testing
+        this.updateDisplayData({
+          name: 'LG UltraGear (Adaptive-Sync Primary)',
+          resolution: `${window.screen.width}x${window.screen.height}`,
+          refreshRate: 165,
+          vrrCap: 161,
+          halfRate: 82,
+          thirdRate: 55
+        });
+      }
+
+      this.initEvents();
+    }
+
+    updateDisplayData(data) {
+      this.currentDisplay = { ...this.currentDisplay, ...data };
+      const { name, resolution, refreshRate, vrrCap, halfRate, thirdRate } = this.currentDisplay;
+
+      if (this.displayNameLabel) this.displayNameLabel.textContent = name;
+      if (this.displayResolutionLabel) this.displayResolutionLabel.textContent = `${resolution} &bull; Active Output`;
+      if (this.displayHzVal) this.displayHzVal.textContent = `${refreshRate} Hz`;
+      if (this.displayVrrCapVal) this.displayVrrCapVal.textContent = `${vrrCap} FPS`;
+      if (this.labelHalfRate) this.labelHalfRate.textContent = `${halfRate} FPS`;
+      if (this.labelThirdRate) this.labelThirdRate.textContent = `${thirdRate} FPS`;
+
+      if (this.btnCalibrateVrr) {
+        this.btnCalibrateVrr.innerHTML = `
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 14 14"></polyline>
+          </svg>
+          Auto VRR (${vrrCap} FPS)
+        `;
+        this.btnCalibrateVrr.title = `Calibrate to detected ${refreshRate}Hz display (Optimal Adaptive-Sync cap: ${vrrCap} FPS)`;
+      }
+
+      // Update 6th Preset Button in Grid
+      const vrrPresetBtn = document.getElementById('preset-vrr-btn');
+      const vrrPresetFps = document.getElementById('preset-vrr-fps');
+      const vrrPresetMs = document.getElementById('preset-vrr-ms');
+      const vrrPresetTitle = document.getElementById('preset-vrr-title');
+
+      if (vrrPresetBtn && vrrPresetFps && vrrPresetMs) {
+        vrrPresetBtn.dataset.fps = vrrCap;
+        vrrPresetFps.textContent = Math.round(vrrCap);
+        vrrPresetMs.textContent = `${(1000.0 / vrrCap).toFixed(2)} ms`;
+        if (vrrPresetTitle) vrrPresetTitle.textContent = `VRR (${refreshRate}Hz)`;
+      }
+    }
+
+    initEvents() {
+      const applyVrr = (btn) => {
+        const cap = this.currentDisplay.vrrCap || 141;
+        updateFpsTarget(cap, true);
+        if (btn) {
+          const orig = btn.innerHTML;
+          btn.textContent = `Calibrated (${cap} FPS)!`;
+          setTimeout(() => { btn.innerHTML = orig; }, 1200);
+        }
+      };
+
+      if (this.btnCalibrateVrr) {
+        this.btnCalibrateVrr.addEventListener('click', () => applyVrr(this.btnCalibrateVrr));
+      }
+
+      if (this.btnApplyVrrSync) {
+        this.btnApplyVrrSync.addEventListener('click', () => applyVrr(this.btnApplyVrrSync));
+      }
+
+      if (this.btnLockHalfVrr) {
+        this.btnLockHalfVrr.addEventListener('click', () => {
+          const half = this.currentDisplay.halfRate || 72;
+          updateFpsTarget(half, true);
+        });
+      }
+
+      if (this.btnLockThirdVrr) {
+        this.btnLockThirdVrr.addEventListener('click', () => {
+          const third = this.currentDisplay.thirdRate || 48;
+          updateFpsTarget(third, true);
+        });
+      }
+    }
+  }
+
+  const displayManager = new DisplayManager();
+
   // VRR Mode Toggle
   if (vrrToggle) {
     vrrToggle.addEventListener('change', (e) => {
       if (e.target.checked) {
-        updateFpsTarget(141, true);
+        const cap = displayManager.currentDisplay.vrrCap || 141;
+        updateFpsTarget(cap, true);
       }
     });
   }

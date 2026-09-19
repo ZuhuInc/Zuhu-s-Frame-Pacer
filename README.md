@@ -10,7 +10,7 @@
   [![Platform](https://img.shields.io/badge/platform-Windows%20x64-blue.svg)](https://github.com/ZuhuInc/Zuhu-s-Frame-Pacer)
   [![C++ Standard](https://img.shields.io/badge/C%2B%2B-17-00599C.svg?logo=c%2B%2B)](https://github.com/ZuhuInc/Zuhu-s-Frame-Pacer)
   [![Electron](https://img.shields.io/badge/Electron-Desktop-47848F.svg?logo=electron)](https://github.com/ZuhuInc/Zuhu-s-Frame-Pacer)
-  [![License](https://img.shields.io/badge/license-ISC-green.svg)](LICENSE)
+  [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 </div>
 
 ---
@@ -30,12 +30,39 @@ Unlike traditional software frame limiters that sleep inside CPU render threads�
 
 ---
 
+## Interface Previews
+
+<div align="center">
+  <h3>Main Pacer Dashboard</h3>
+  <img src="assets/images/MenuMain.png" alt="FramePacer Main Dashboard" width="850">
+
+  <br><br>
+
+  <table align="center">
+    <tr>
+      <td align="center" width="50%">
+        <strong>Cyberpunk Mini Widget Mode</strong><br><br>
+        <img src="assets/images/MenuMini.png" alt="Mini Widget Mode" width="400">
+      </td>
+      <td align="center" width="50%">
+        <strong>In-Game Telemetry HUD Overlay</strong><br><br>
+        <img src="assets/images/Overlay.png" alt="In-Game HUD Overlay" width="380">
+      </td>
+    </tr>
+  </table>
+</div>
+
+---
+
 ## Key Features
 
 - **Presentation-Edge Pacing**: Clamps frametimes right before the GPU swapchain flip, eliminating micro-stutters and uneven frame pacing.
+- **Adaptive-Sync / VRR Auto-Calibration**: Automatically queries your display's native refresh rate (144Hz, 165Hz, 180Hz, 240Hz, etc.) and locks to the mathematically ideal reflex guard ceiling (e.g. 141 FPS on 144Hz, 161 FPS on 165Hz, 237 FPS on 240Hz) for zero-lag tear-free gameplay.
+- **Game Profiles & Library**: Automatically tracks played games, remembers custom FPS limits per title, and provides a per-game bypass/uncapped switch.
+- **Lossless Scaling & Frame Gen Sync Ratios**: Built-in 1/2x and 1/3x refresh rate multipliers tuned for pairing with LSFG, FSR 3, and DLSS 3 Frame Generation.
 - **Sub-Millisecond Precision**: Combines `timeBeginPeriod(1)`, `CreateWaitableTimerEx`, and High-Resolution Query Performance Counters (QPC) with adaptive spin-wait loops.
 - **Real-Time Oscilloscope**: Live visual frametime waveform oscilloscope, rolling FPS average, standard deviation jitter calculation (±µs), and 1% low consistency metrics.
-- **Compact Mini Mode**: Switch to a sleek cyberpunk floating widget (480 × 290) with one click or hotkey.
+- **Compact Mini Mode with Direct Type-in**: Switch to a sleek cyberpunk floating widget (480 × 290) with direct click-to-type numeric framerate editing.
 - **In-Game Transparent HUD Overlay**: Hardware-accelerated GDI+ click-through overlay with anti-aliased live sparkline graphs.
 - **Safe Auto-Attach Engine**: Automatically detects active 3D game windows while safeguarding system processes, background overlays, and anti-cheat protected titles.
 - **Zero Global Registry Pollution**: In-process hooking that leaves your Windows Vulkan and DirectX system registry 100% clean.
@@ -122,10 +149,12 @@ FramePacer/
 - [x] DirectX 11 & DirectX 12 Presentation-Edge Pacing
 - [x] Real-time oscilloscope with Jitter (±µs) and 1% lows
 - [x] Hardware-accelerated transparent in-game HUD
-- [x] Mini mode Cyberpunk widget
-- [x] Standalone .exe packaging
+- [x] Mini mode Cyberpunk widget with direct numeric input
+- [x] Standalone single-file .exe packaging
+- [x] Per-game custom profiles & auto-saving library
+- [x] Adaptive-Sync / VRR Display Detection & Auto-Calibration
+- [x] Lossless Scaling & Frame Generation sync multipliers
 - [ ] In-process Native Vulkan (`vkQueuePresentKHR`) engine
-- [ ] Per-game profile auto-saving & auto-loading
 - [ ] Steam Deck / Windows Handheld auto-TDP synchronization
 
 ---
@@ -140,6 +169,6 @@ Because DLL injection and presentation table hooking are used, kernel-level mult
 
 ## License
 
-Distributed under the **ISC License**. See `LICENSE` for more information.
+Distributed under the **MIT License**. See `LICENSE` for more information.
 
 Developed by **ZuhuInc**.

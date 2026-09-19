@@ -11,5 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onPinStateChanged: (callback) => ipcRenderer.on('pin-state-changed', (_event, value) => callback(value)),
   selectGameExe: () => ipcRenderer.invoke('select-game-exe'),
   saveProfiles: (data) => ipcRenderer.invoke('save-profiles', data),
-  loadProfiles: () => ipcRenderer.invoke('load-profiles')
+  loadProfiles: () => ipcRenderer.invoke('load-profiles'),
+  getDisplayInfo: () => ipcRenderer.invoke('get-display-info'),
+  onDisplayChanged: (callback) => ipcRenderer.on('display-changed', (_event, value) => callback(value))
 });

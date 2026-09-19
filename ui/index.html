@@ -289,10 +289,10 @@
             <span class="preset-title">120Hz Ultra</span>
           </button>
 
-          <button class="preset-btn" data-fps="141">
-            <span class="preset-fps">141</span>
-            <span class="preset-ms">7.09 ms</span>
-            <span class="preset-title">VRR G-Sync Max</span>
+          <button class="preset-btn" id="preset-vrr-btn" data-fps="141">
+            <span class="preset-fps" id="preset-vrr-fps">141</span>
+            <span class="preset-ms" id="preset-vrr-ms">7.09 ms</span>
+            <span class="preset-title" id="preset-vrr-title">VRR / Adaptive</span>
           </button>
         </div>
 
@@ -579,6 +579,83 @@
             <input type="checkbox" id="toggle-vrr-mode" checked>
             <span class="switch-slider"></span>
           </label>
+        </div>
+      </section>
+
+      <!-- Display & Adaptive-Sync Calibration Hub -->
+      <section class="card" style="grid-column: span 2;">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+            Display & Adaptive-Sync / VRR Engine
+          </div>
+          <div class="cadence-badge" id="vrr-status-badge">
+            <div class="status-dot" style="background: var(--cyan-accent); box-shadow: 0 0 8px var(--cyan-accent);"></div>
+            <span id="vrr-status-text">Adaptive-Sync Ready</span>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 14px; align-items: start;">
+          <!-- Left: Display Telemetry Card -->
+          <div class="display-telemetry-box">
+            <div class="display-header-row">
+              <div class="display-avatar-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+                  <line x1="8" y1="21" x2="16" y2="21"></line>
+                  <line x1="12" y1="17" x2="12" y2="21"></line>
+                </svg>
+              </div>
+              <div class="display-details">
+                <div class="display-title-row">
+                  <span class="display-name" id="display-name-label">Detecting Display...</span>
+                  <span class="display-primary-tag">PRIMARY</span>
+                </div>
+                <div class="display-subtext" id="display-resolution-label">Scanning active display outputs...</div>
+              </div>
+            </div>
+
+            <div class="display-stats-grid">
+              <div class="metric-box">
+                <span class="metric-label">Scanout Rate</span>
+                <span class="metric-value highlight-cyan" id="display-hz-val">144 Hz</span>
+                <span class="metric-subtext">Native Refresh</span>
+              </div>
+              <div class="metric-box">
+                <span class="metric-label">VRR Guard Cap</span>
+                <span class="metric-value highlight-emerald" id="display-vrr-cap-val">141 FPS</span>
+                <span class="metric-subtext">Zero Input Lag</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Calibration & Frame Gen Helpers -->
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <button class="btn-primary" id="btn-apply-vrr-sync" style="padding: 10px 14px; font-size: 0.82rem;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 14 14"></polyline>
+              </svg>
+              Auto-Calibrate Adaptive-Sync Lock
+            </button>
+
+            <div style="font-size: 0.72rem; color: var(--text-dim); margin-top: 2px;">
+              Lossless Scaling (LSFG) & Frame Generation Sync Ratios:
+            </div>
+
+            <div class="action-btn-group" style="gap: 8px;">
+              <button class="btn-secondary" id="btn-lock-half-vrr" style="padding: 8px 10px; font-size: 0.76rem;" title="Pace base framerate to exactly 1/2 of display refresh rate for artifact-free 2x frame generation">
+                1/2 Rate (<span id="label-half-rate">72 FPS</span>)
+              </button>
+              <button class="btn-secondary" id="btn-lock-third-vrr" style="padding: 8px 10px; font-size: 0.76rem;" title="Pace base framerate to exactly 1/3 of display refresh rate for artifact-free 3x frame generation">
+                1/3 Rate (<span id="label-third-rate">48 FPS</span>)
+              </button>
+            </div>
+          </div>
         </div>
       </section>
     </main>

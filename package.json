@@ -50,7 +50,7 @@
   },
   "keywords": [],
   "author": "FramePacer Team",
-  "license": "ISC",
+  "license": "MIT",
   "type": "commonjs",
   "devDependencies": {
     "@electron/packager": "^20.3.0",
