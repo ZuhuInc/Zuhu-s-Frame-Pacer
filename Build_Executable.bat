@@ -28,6 +28,6 @@ if %ERRORLEVEL% NEQ 0 (
 echo.
 echo ================================================================
 echo  SUCCESS! Single-File Standalone Executable is ready at:
-echo  dist\FramePacer-Portable.exe
+echo  dist_release\FramePacer-Portable.exe
 echo ================================================================
 pause

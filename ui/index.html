@@ -73,8 +73,9 @@
         <span class="mini-process-name" id="mini-process-name">Waiting for game...</span>
       </div>
 
-      <div class="mini-cap-box" id="mini-cap-box" title="Target FPS Limit">
+      <div class="mini-cap-box" id="mini-cap-box" title="Click to edit Target FPS Limit">
         <span class="mini-cap-val" id="mini-fps-val">60</span>
+        <input type="number" id="mini-cap-input" class="mini-cap-input" min="10" max="360" step="1" value="60" style="display: none;" />
       </div>
     </div>
 
@@ -117,9 +118,18 @@
       </div>
 
       <!-- Process Hook Badge & Switcher -->
-      <div class="hook-status-badge waiting" id="hook-status-badge" title="Active Game Process Hook">
-        <div class="status-dot"></div>
-        <span><strong id="process-name">Waiting for game...</strong> (<span id="process-api">Standby</span>)</span>
+      <div class="header-controls">
+        <div class="profile-status-pill" id="active-profile-pill" title="Active Game Profile Configuration">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+          </svg>
+          <span id="active-profile-name">Global Default</span>
+        </div>
+        <div class="hook-status-badge waiting" id="hook-status-badge" title="Active Game Process Hook">
+          <div class="status-dot"></div>
+          <span><strong id="process-name">Waiting for game...</strong> (<span id="process-api">Standby</span>)</span>
+        </div>
       </div>
     </header>
 
@@ -130,6 +140,13 @@
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
         </svg>
         Pacer Dashboard
+      </button>
+      <button class="tab-btn" data-tab="profiles">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+        </svg>
+        Game Profiles
       </button>
       <button class="tab-btn" data-tab="engine">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -331,6 +348,134 @@
           </button>
         </div>
 
+      </section>
+    </main>
+
+    <!-- TAB: GAME PROFILES & LIBRARY -->
+    <main class="dashboard-grid tab-pane" id="tab-profiles" style="display: none;">
+      <!-- Left Column: Global Baseline Settings -->
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+            Global Default Baseline
+          </div>
+          <div class="cadence-badge" style="background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.3); color: var(--cyan-accent);">
+            Auto-Applied to New Games
+          </div>
+        </div>
+
+        <div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.5;">
+          These baseline settings are automatically applied to any newly launched game before a custom profile is saved.
+        </div>
+
+        <!-- Global Default Target FPS -->
+        <div class="slider-control-group">
+          <div class="slider-header">
+            <span class="slider-title">Default Target Framerate</span>
+            <div class="slider-numeric-input">
+              <input type="number" id="global-default-fps-input" class="fps-input-box" value="60" min="10" max="360" step="1">
+              <span class="fps-unit">FPS</span>
+            </div>
+          </div>
+          <div class="range-slider-wrapper">
+            <input type="range" id="global-default-fps-slider" min="10" max="240" step="1" value="60">
+          </div>
+        </div>
+
+        <!-- Global Default Pacer State -->
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+              </svg>
+              Default Frame Pacing Enabled
+            </div>
+            <div class="toggle-desc">Automatically pace new games on startup</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="global-default-pacer-toggle" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <!-- Global Default Queue Clamp -->
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="20" x2="18" y2="10"></line>
+                <line x1="12" y1="20" x2="12" y2="4"></line>
+                <line x1="6" y1="20" x2="6" y2="14"></line>
+              </svg>
+              Default Latency Clamp
+            </div>
+            <div class="toggle-desc">Set Maximum Frame Latency = 1 for lowest input lag</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="global-default-clamp-toggle" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <!-- Global Quick Action: Save / Reset -->
+        <div class="action-btn-group" style="margin-top: auto;">
+          <button class="btn-primary" id="btn-save-global-default">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+              <polyline points="17 21 17 13 7 13 7 21"></polyline>
+              <polyline points="7 3 7 8 15 8"></polyline>
+            </svg>
+            Save Global Default
+          </button>
+          <button class="btn-secondary" id="btn-sync-active-game">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+            Import Current Game
+          </button>
+        </div>
+      </section>
+
+      <!-- Right Column: Game Profiles Library & Tuning -->
+      <section class="card" style="display: flex; flex-direction: column;">
+        <div class="card-header" style="flex-wrap: wrap; gap: 8px;">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            </svg>
+            Tracked Games Library (<span id="profile-count">0</span>)
+          </div>
+          <button class="btn-primary" id="btn-add-game-manual" style="padding: 6px 12px; font-size: 0.78rem;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Add Game (.exe)
+          </button>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="profile-search-bar">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="profile-search-input" placeholder="Search played games, executables..." />
+        </div>
+
+        <!-- Scrollable Profile List -->
+        <div class="profiles-list-container" id="profiles-list-container">
+          <!-- Populated dynamically via app.js ProfileManager -->
+        </div>
       </section>
     </main>
 

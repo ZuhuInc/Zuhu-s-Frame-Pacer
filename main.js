@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut, Tray, Menu, ipcMain, nativeImage } = require('electron');
+const { app, BrowserWindow, globalShortcut, Tray, Menu, ipcMain, nativeImage, dialog } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -201,6 +201,65 @@ function createWindow() {
   ipcMain.handle('window-close', () => {
     isQuitting = true;
     app.quit();
+  });
+
+  // Profile Storage IPC
+  const getProfilesPath = () => {
+    const userDataDir = app.getPath('userData');
+    return path.join(userDataDir, 'profiles.json');
+  };
+
+  ipcMain.handle('select-game-exe', async () => {
+    if (!mainWindow) return null;
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Select Game Executable',
+      filters: [
+        { name: 'Executable Files', extensions: ['exe'] },
+        { name: 'All Files', extensions: ['*'] }
+      ],
+      properties: ['openFile']
+    });
+    if (!result.canceled && result.filePaths.length > 0) {
+      const selectedPath = result.filePaths[0];
+      const exeName = path.basename(selectedPath);
+      // Generate clean display name (e.g., "cyberpunk2077.exe" -> "Cyberpunk 2077")
+      let cleanName = exeName.replace(/\.exe$/i, '');
+      cleanName = cleanName.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      return {
+        path: selectedPath,
+        exe: exeName.toLowerCase(),
+        name: cleanName
+      };
+    }
+    return null;
+  });
+
+  ipcMain.handle('save-profiles', async (_event, data) => {
+    try {
+      const filePath = getProfilesPath();
+      const dir = path.dirname(filePath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+      return true;
+    } catch (e) {
+      console.error('[App] Failed to save profiles:', e);
+      return false;
+    }
+  });
+
+  ipcMain.handle('load-profiles', async () => {
+    try {
+      const filePath = getProfilesPath();
+      if (fs.existsSync(filePath)) {
+        const raw = fs.readFileSync(filePath, 'utf8');
+        return JSON.parse(raw);
+      }
+    } catch (e) {
+      console.error('[App] Failed to load profiles:', e);
+    }
+    return null;
   });
 }
 

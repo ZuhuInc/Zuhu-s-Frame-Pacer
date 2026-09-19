@@ -5,6 +5,7 @@ package-lock.json
 # Build & Distribution Artifacts
 dist/
 dist_portable/
+dist_release/
 release/
 *.tmp
 *.7z

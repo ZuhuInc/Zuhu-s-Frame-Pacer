@@ -6,7 +6,7 @@
   "scripts": {
     "start": "electron .",
     "compile:cpp": "build.bat",
-    "package": "electron-builder --win portable --config.directories.output=dist",
+    "package": "npx electron-builder --win portable --config.directories.output=dist_release",
     "build:exe": "npm run compile:cpp && npm run package",
     "build:unpacked": "node -e \"const mod = require('png-to-ico'); const fn = mod.default || mod; const fs = require('fs'); fn('assets/framepacer-logo.png').then(buf => fs.writeFileSync('assets/icon.ico', buf));\" && electron-packager . FramePacer --platform=win32 --arch=x64 --out=release --overwrite --icon=assets/icon.ico --extra-resource=bin"
   },
