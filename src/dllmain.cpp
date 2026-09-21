@@ -3,10 +3,22 @@
 #include "vulkan_hook.h"
 
 DWORD WINAPI HookInitThread(LPVOID lpParam) {
-    // Initialize DirectX (DX11/DX12) presentation hooks
-    FramePacer::DXGIHookEngine::Instance().Initialize();
-    // Initialize Vulkan (VK_KHR_swapchain) presentation hooks
-    FramePacer::VulkanHookEngine::Instance().Initialize();
+    // Safety delay to allow game's DirectX 11/12 graphics engine and command queues to stabilize
+    Sleep(600);
+
+    __try {
+        // Initialize DirectX (DX11/DX12) presentation hooks
+        FramePacer::DXGIHookEngine::Instance().Initialize();
+
+        // Only initialize Vulkan hooks if vulkan-1.dll is loaded in the process
+        if (GetModuleHandleW(L"vulkan-1.dll") != NULL) {
+            FramePacer::VulkanHookEngine::Instance().Initialize();
+        }
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        // Safely catch any initialization anomalies in protected games
+    }
+
     return 0;
 }
 
@@ -17,8 +29,12 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
         CreateThread(NULL, 0, HookInitThread, NULL, 0, NULL);
         break;
     case DLL_PROCESS_DETACH:
-        FramePacer::DXGIHookEngine::Instance().Shutdown();
-        FramePacer::VulkanHookEngine::Instance().Shutdown();
+        __try {
+            FramePacer::DXGIHookEngine::Instance().Shutdown();
+            FramePacer::VulkanHookEngine::Instance().Shutdown();
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER) {
+        }
         break;
     }
     return TRUE;

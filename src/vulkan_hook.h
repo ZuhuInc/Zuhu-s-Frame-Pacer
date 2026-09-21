@@ -88,8 +88,6 @@ public:
         return m_fnOriginalQueuePresent;
     }
 
-    void HookLoadedModules();
-
 private:
     VulkanHookEngine();
     ~VulkanHookEngine();

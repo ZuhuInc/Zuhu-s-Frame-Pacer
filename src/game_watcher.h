@@ -14,6 +14,7 @@
 #include <thread>
 #include <atomic>
 #include <chrono>
+#include <mutex>
 
 namespace FramePacer {
 
@@ -122,6 +123,24 @@ public:
     }
 
     bool IsEnabled() const { return m_isEnabled; }
+
+    void SetBypassedGames(const std::vector<std::wstring>& exes) {
+        std::lock_guard<std::mutex> lock(m_blocklistMutex);
+        m_bypassedGames.clear();
+        for (const auto& exe : exes) {
+            std::wstring lower = exe;
+            std::transform(lower.begin(), lower.end(), lower.begin(), ::towlower);
+            m_bypassedGames.insert(lower);
+        }
+        std::wcout << L"[GameWatcher] Updated bypassed/ignored games list (" << m_bypassedGames.size() << L" entries)" << std::endl;
+    }
+
+    bool IsProcessBypassed(const std::wstring& exe) {
+        std::lock_guard<std::mutex> lock(m_blocklistMutex);
+        std::wstring lower = exe;
+        std::transform(lower.begin(), lower.end(), lower.begin(), ::towlower);
+        return m_bypassedGames.find(lower) != m_bypassedGames.end();
+    }
 
 private:
     GameWatcher() : m_isRunning(false), m_isEnabled(true) {}
@@ -257,7 +276,7 @@ private:
                 std::wstring lowerExe = exeName;
                 std::transform(lowerExe.begin(), lowerExe.end(), lowerExe.begin(), ::towlower);
 
-                if (SYSTEM_BLOCKLIST.find(lowerExe) == SYSTEM_BLOCKLIST.end()) {
+                if (SYSTEM_BLOCKLIST.find(lowerExe) == SYSTEM_BLOCKLIST.end() && !self->IsProcessBypassed(lowerExe)) {
                     self->InjectIntoPid(pid, exeName);
                 }
             }
@@ -280,6 +299,8 @@ private:
     std::atomic<bool> m_isEnabled;
     std::wstring m_dllPath;
     std::unordered_set<DWORD> m_injectedPids;
+    std::unordered_set<std::wstring> m_bypassedGames;
+    std::mutex m_blocklistMutex;
     std::thread m_workerThread;
 };
 

@@ -9,6 +9,7 @@ dist_release/
 release/
 *.tmp
 *.7z
+*.old
 
 # Compiler / Intermediate Objects
 *.obj

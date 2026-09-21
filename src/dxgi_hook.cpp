@@ -271,6 +271,12 @@ HRESULT DXGIHookEngine::OnPresent(IDXGISwapChain* pSwapChain, UINT SyncInterval,
     }
 
     FramePacerControlBlock* pIpc = m_ipc.Get();
+    if (pIpc && pIpc->target_fps > 0 && pIpc->target_fps != m_lastTargetFps) {
+        m_lastTargetFps = pIpc->target_fps;
+        m_pacer.SetTargetFps(m_lastTargetFps);
+        m_pacer.Reset();
+    }
+
     bool pacingActive = pIpc ? (pIpc->pacing_enabled != 0) : true;
 
     double frameTimeMs = 0.0;
@@ -305,6 +311,12 @@ HRESULT DXGIHookEngine::OnPresent1(IDXGISwapChain1* pSwapChain, UINT SyncInterva
     }
 
     FramePacerControlBlock* pIpc = m_ipc.Get();
+    if (pIpc && pIpc->target_fps > 0 && pIpc->target_fps != m_lastTargetFps) {
+        m_lastTargetFps = pIpc->target_fps;
+        m_pacer.SetTargetFps(m_lastTargetFps);
+        m_pacer.Reset();
+    }
+
     bool pacingActive = pIpc ? (pIpc->pacing_enabled != 0) : true;
 
     double frameTimeMs = 0.0;

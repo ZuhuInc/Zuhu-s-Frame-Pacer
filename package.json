@@ -45,7 +45,8 @@
       "createStartMenuShortcut": true
     },
     "portable": {
-      "artifactName": "FramePacer-Portable.exe"
+      "artifactName": "FramePacer-Portable.exe",
+      "unpackDirName": "FramePacer"
     }
   },
   "keywords": [],

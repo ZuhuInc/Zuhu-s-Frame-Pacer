@@ -118,6 +118,26 @@ void ProcessWebSocketMessage(const std::string& msg, FramePacer::SharedMemoryCha
             pBlock->overlay_position = pos;
             std::cout << "[Bridge] Overlay Position -> " << pos << std::endl;
         }
+    } else if (msg.find("SET_BYPASSED_GAMES") != std::string::npos) {
+        // Parse array of executable strings: {"type":"SET_BYPASSED_GAMES","exes":["game.exe",...]}
+        std::vector<std::wstring> exes;
+        size_t arrStart = msg.find('[');
+        size_t arrEnd = msg.find(']');
+        if (arrStart != std::string::npos && arrEnd != std::string::npos && arrEnd > arrStart) {
+            std::string items = msg.substr(arrStart + 1, arrEnd - arrStart - 1);
+            size_t pos = 0;
+            while ((pos = items.find('"')) != std::string::npos) {
+                size_t nextQuote = items.find('"', pos + 1);
+                if (nextQuote == std::string::npos) break;
+                std::string exe = items.substr(pos + 1, nextQuote - pos - 1);
+                if (!exe.empty()) {
+                    std::wstring wExe(exe.begin(), exe.end());
+                    exes.push_back(wExe);
+                }
+                items = items.substr(nextQuote + 1);
+            }
+        }
+        FramePacer::GameWatcher::Instance().SetBypassedGames(exes);
     }
 }
 

@@ -598,9 +598,14 @@ textarea,
   gap: 16px;
 }
 
+#tab-profiles {
+  grid-template-columns: 1fr 1fr !important;
+}
+
 @media (max-width: 960px) {
-  .dashboard-grid {
-    grid-template-columns: 1fr;
+  .dashboard-grid,
+  #tab-profiles {
+    grid-template-columns: 1fr !important;
   }
 }
 

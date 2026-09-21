@@ -109,6 +109,10 @@ class IPCBridge {
     this.send("SET_OVERLAY_POSITION", { position });
   }
 
+  setBypassedGames(exes) {
+    this.send("SET_BYPASSED_GAMES", { exes });
+  }
+
   syncSettings() {
     this.setTargetFps(this.settings.targetFps);
     this.setPacingEnabled(this.settings.pacingEnabled);

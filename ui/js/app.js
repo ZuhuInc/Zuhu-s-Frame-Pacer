@@ -110,8 +110,29 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('[ProfileManager] Failed to load profiles:', e);
       }
 
+      if (this.globalDefault.pacingEnabled === undefined) {
+        this.globalDefault.pacingEnabled = true;
+      }
+      if (this.globalDefault.latencyClamp === undefined) {
+        this.globalDefault.latencyClamp = true;
+      }
+
       this.syncGlobalDefaultUI();
+      const initialEnabled = (this.globalDefault.pacingEnabled !== false);
+      if (masterToggle) masterToggle.checked = initialEnabled;
+      oscilloscope.setPacingState(initialEnabled);
+      ipc.setPacingEnabled(initialEnabled);
+      updateFpsTarget(this.globalDefault.fpsCap || 60, true);
+
       this.renderList();
+      this.syncBypassedGamesWithBridge();
+    }
+
+    syncBypassedGamesWithBridge() {
+      const bypassed = Object.keys(this.profiles).filter(exe => !this.profiles[exe].enabled);
+      if (window.ipc && typeof window.ipc.setBypassedGames === 'function') {
+        window.ipc.setBypassedGames(bypassed);
+      }
     }
 
     async save() {
@@ -127,13 +148,14 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch (e) {
         console.error('[ProfileManager] Failed to save profiles:', e);
       }
+      this.syncBypassedGamesWithBridge();
     }
 
     syncGlobalDefaultUI() {
-      if (this.globalDefaultFpsInput) this.globalDefaultFpsInput.value = this.globalDefault.fpsCap;
-      if (this.globalDefaultFpsSlider) this.globalDefaultFpsSlider.value = this.globalDefault.fpsCap;
-      if (this.globalDefaultPacerToggle) this.globalDefaultPacerToggle.checked = this.globalDefault.pacingEnabled;
-      if (this.globalDefaultClampToggle) this.globalDefaultClampToggle.checked = this.globalDefault.latencyClamp;
+      if (this.globalDefaultFpsInput) this.globalDefaultFpsInput.value = this.globalDefault.fpsCap || 60;
+      if (this.globalDefaultFpsSlider) this.globalDefaultFpsSlider.value = this.globalDefault.fpsCap || 60;
+      if (this.globalDefaultPacerToggle) this.globalDefaultPacerToggle.checked = (this.globalDefault.pacingEnabled !== false);
+      if (this.globalDefaultClampToggle) this.globalDefaultClampToggle.checked = (this.globalDefault.latencyClamp !== false);
     }
 
     initEvents() {
@@ -281,18 +303,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     onGameDetected(processExe, rawProcessName) {
       if (!processExe) {
+        const wasActive = (this.activeExe !== null);
         this.activeExe = null;
         this.activeName = null;
         if (this.activeProfileName) this.activeProfileName.textContent = 'Global Default';
         if (this.activeProfilePill) {
           this.activeProfilePill.title = 'Global Default Baseline Active';
         }
-        this.renderList(this.profileSearchInput ? this.profileSearchInput.value.trim().toLowerCase() : '');
+        if (wasActive) {
+          const globalEnabled = (this.globalDefault.pacingEnabled !== false);
+          if (masterToggle) masterToggle.checked = globalEnabled;
+          oscilloscope.setPacingState(globalEnabled);
+          ipc.setPacingEnabled(globalEnabled);
+          updateFpsTarget(this.globalDefault.fpsCap || 60, true);
+          this.renderList(this.profileSearchInput ? this.profileSearchInput.value.trim().toLowerCase() : '');
+        }
         return;
       }
 
       const exe = processExe.toLowerCase();
       const isNewGame = (this.activeExe !== exe);
+      const isFirstRegistration = !this.profiles[exe];
       this.activeExe = exe;
 
       // Extract clean title
@@ -303,14 +334,14 @@ document.addEventListener('DOMContentLoaded', () => {
       cleanTitle = cleanTitle.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
       this.activeName = cleanTitle;
 
-      if (!this.profiles[exe]) {
+      if (isFirstRegistration) {
         // Auto-register new game with Global Default Baseline
         this.profiles[exe] = {
           name: cleanTitle,
           exe: exe,
-          fpsCap: this.globalDefault.fpsCap,
-          enabled: this.globalDefault.pacingEnabled,
-          latencyClamp: this.globalDefault.latencyClamp,
+          fpsCap: this.globalDefault.fpsCap || 60,
+          enabled: (this.globalDefault.pacingEnabled !== false),
+          latencyClamp: (this.globalDefault.latencyClamp !== false),
           lastPlayed: new Date().toISOString()
         };
         this.save();
@@ -320,27 +351,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!this.profiles[exe].name || this.profiles[exe].name === exe) {
           this.profiles[exe].name = cleanTitle;
         }
-        this.save();
       }
 
       const profile = this.profiles[exe];
 
       // If switching to this game for first time in session, apply profile settings
       if (isNewGame) {
-        if (!profile.enabled) {
-          // Bypass mode: unconstrained framerate
-          masterToggle.checked = false;
-          oscilloscope.setPacingState(false);
-          ipc.setPacingEnabled(false);
-        } else {
-          masterToggle.checked = true;
-          oscilloscope.setPacingState(true);
-          ipc.setPacingEnabled(true);
-          updateFpsTarget(profile.fpsCap, true);
-          if (queueClampToggle) {
-            queueClampToggle.checked = profile.latencyClamp;
-            ipc.setQueueDepthClamp(profile.latencyClamp);
-          }
+        const isEnabled = (profile.enabled !== false);
+        if (masterToggle) masterToggle.checked = isEnabled;
+        oscilloscope.setPacingState(isEnabled);
+        ipc.setPacingEnabled(isEnabled);
+        updateFpsTarget(profile.fpsCap || this.globalDefault.fpsCap || 60, true);
+        if (queueClampToggle) {
+          queueClampToggle.checked = (profile.latencyClamp !== false);
+          ipc.setQueueDepthClamp(queueClampToggle.checked);
         }
       }
 
@@ -356,7 +380,10 @@ document.addEventListener('DOMContentLoaded', () => {
         this.activeProfilePill.title = `Profile: ${profile.name} (${profile.exe}) - ${profile.enabled ? `${profile.fpsCap} FPS Cap` : 'Bypassed'}`;
       }
 
-      this.renderList(this.profileSearchInput ? this.profileSearchInput.value.trim().toLowerCase() : '');
+      // ONLY re-render the list if it's a new game or first registration
+      if (isNewGame || isFirstRegistration) {
+        this.renderList(this.profileSearchInput ? this.profileSearchInput.value.trim().toLowerCase() : '');
+      }
     }
 
     updateActiveGameFps(newFps) {
@@ -366,7 +393,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (this.activeProfileName && this.profiles[this.activeExe].enabled) {
           this.activeProfileName.textContent = `${this.profiles[this.activeExe].name} [${Math.round(newFps)} FPS]`;
         }
-        this.renderList(this.profileSearchInput ? this.profileSearchInput.value.trim().toLowerCase() : '');
+        // Update matching card in-place if present
+        if (this.profilesListContainer) {
+          const matchingCard = this.profilesListContainer.querySelector(`.profile-item-card[data-exe="${this.activeExe}"]`);
+          if (matchingCard) {
+            const pillText = matchingCard.querySelector('.pill-fps-text');
+            const pillInput = matchingCard.querySelector('.profile-fps-inline-input');
+            if (pillText && this.profiles[this.activeExe].enabled) {
+              pillText.textContent = `${Math.round(newFps)} FPS`;
+            }
+            if (pillInput) {
+              pillInput.value = Math.round(newFps);
+            }
+          }
+        }
       }
     }
 
@@ -411,6 +451,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const isCurrentRunning = (this.activeExe === profile.exe);
         const card = document.createElement('div');
         card.className = `profile-item-card ${isCurrentRunning ? 'active-running' : ''} ${!profile.enabled ? 'bypassed' : ''}`;
+        card.dataset.exe = profile.exe;
 
         const letter = (profile.name && profile.name.length > 0) ? profile.name.charAt(0).toUpperCase() : 'G';
         const formattedTime = timeAgo(profile.lastPlayed);
@@ -454,13 +495,29 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         `;
 
-        // Attach event listeners for this card
+        // Cache elements
         const toggle = card.querySelector('.profile-toggle-enabled');
+        const deleteBtn = card.querySelector('.btn-profile-delete');
+        const pill = card.querySelector('.profile-fps-pill');
+        const pillText = card.querySelector('.pill-fps-text');
+        const pillInput = card.querySelector('.profile-fps-inline-input');
+
+        // Attach event listeners for this card
         if (toggle) {
           toggle.addEventListener('change', (e) => {
             const isChecked = e.target.checked;
             profile.enabled = isChecked;
             this.save();
+
+            // In-place UI update without full list destruction
+            card.classList.toggle('bypassed', !isChecked);
+            if (pillText) {
+              pillText.textContent = isChecked ? `${Math.round(profile.fpsCap)} FPS` : 'Bypassed';
+            }
+            if (toggle.parentElement) {
+              toggle.parentElement.title = isChecked ? 'Pacing Active' : 'Pacing Bypassed (Uncapped)';
+            }
+
             if (isCurrentRunning) {
               masterToggle.checked = isChecked;
               oscilloscope.setPacingState(isChecked);
@@ -471,13 +528,12 @@ document.addEventListener('DOMContentLoaded', () => {
                   : `${profile.name} [BYPASS]`;
               }
             }
-            this.renderList(this.profileSearchInput ? this.profileSearchInput.value.trim().toLowerCase() : '');
           });
         }
 
-        const deleteBtn = card.querySelector('.btn-profile-delete');
         if (deleteBtn) {
-          deleteBtn.addEventListener('click', () => {
+          deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
             delete this.profiles[profile.exe];
             this.save();
             if (isCurrentRunning) {
@@ -490,15 +546,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 this.activeProfileName.textContent = `${profile.name} [${Math.round(this.globalDefault.fpsCap)} FPS]`;
               }
             }
-            this.renderList(this.profileSearchInput ? this.profileSearchInput.value.trim().toLowerCase() : '');
+            card.remove();
+            const count = Object.keys(this.profiles).length;
+            if (this.profileCount) this.profileCount.textContent = count;
+            if (count === 0) {
+              this.renderList();
+            }
           });
         }
 
         // Inline FPS Pill Click-to-Edit
-        const pill = card.querySelector('.profile-fps-pill');
-        const pillText = card.querySelector('.pill-fps-text');
-        const pillInput = card.querySelector('.profile-fps-inline-input');
-
         if (pill && pillText && pillInput) {
           pill.addEventListener('click', (e) => {
             if (e.target === pillInput) return;
@@ -544,6 +601,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const profileManager = new ProfileManager();
   profileManager.load();
+
+  ipc.on('status', (data) => {
+    if (data && data.connected) {
+      profileManager.syncBypassedGamesWithBridge();
+    }
+  });
 
   // Handle Real-Time Live Game Telemetry from Bridge
   ipc.on('frame', (data) => {

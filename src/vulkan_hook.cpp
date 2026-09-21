@@ -22,7 +22,6 @@ static std::atomic<bool> s_hookedVulkan(false);
 static VkResult VKAPI_CALL Hooked_vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPresentInfo);
 static PFN_vkVoidFunction VKAPI_CALL Hooked_vkGetDeviceProcAddr(VkDevice device, const char* pName);
 static PFN_vkVoidFunction VKAPI_CALL Hooked_vkGetInstanceProcAddr(VkInstance instance, const char* pName);
-static FARPROC WINAPI Hooked_GetProcAddress(HMODULE hModule, LPCSTR lpProcName);
 
 static PFN_vkVoidFunction VKAPI_CALL Hooked_vkGetDeviceProcAddr(VkDevice device, const char* pName) {
     if (pName && std::strcmp(pName, "vkQueuePresentKHR") == 0) {
@@ -67,118 +66,60 @@ static PFN_vkVoidFunction VKAPI_CALL Hooked_vkGetInstanceProcAddr(VkInstance ins
     return nullptr;
 }
 
-static FARPROC WINAPI Hooked_GetProcAddress(HMODULE hModule, LPCSTR lpProcName) {
-    if (!lpProcName || (reinterpret_cast<ULONG_PTR>(lpProcName) <= 0xFFFF)) {
-        if (s_realGetProcAddress) return s_realGetProcAddress(hModule, lpProcName);
-        return GetProcAddress(hModule, lpProcName);
+static bool IsBlockedProcessName(const char* procName) {
+    if (!procName) return true;
+    char lower[128] = {};
+    for (size_t i = 0; procName[i] && i < 127; ++i) {
+        lower[i] = static_cast<char>(tolower(static_cast<unsigned char>(procName[i])));
     }
-
-    if (std::strcmp(lpProcName, "vkGetInstanceProcAddr") == 0) {
-        if (!s_realVkGetInstanceProcAddr) {
-            FARPROC realProc = s_realGetProcAddress ? s_realGetProcAddress(hModule, lpProcName) : GetProcAddress(hModule, lpProcName);
-            if (realProc) s_realVkGetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(realProc);
-        }
-        return reinterpret_cast<FARPROC>(Hooked_vkGetInstanceProcAddr);
+    if (strstr(lower, "nvidia") || strstr(lower, "overlay") || strstr(lower, "discord") ||
+        strstr(lower, "electron") || strstr(lower, "obs") || strstr(lower, "rtss") ||
+        strstr(lower, "steam") || strstr(lower, "chrome") || strstr(lower, "framepacer") ||
+        strstr(lower, "gamebar") || strstr(lower, "radeon") || strstr(lower, "overwolf")) {
+        return true;
     }
-
-    if (std::strcmp(lpProcName, "vkGetDeviceProcAddr") == 0) {
-        if (!s_realVkGetDeviceProcAddr) {
-            FARPROC realProc = s_realGetProcAddress ? s_realGetProcAddress(hModule, lpProcName) : GetProcAddress(hModule, lpProcName);
-            if (realProc) s_realVkGetDeviceProcAddr = reinterpret_cast<PFN_vkGetDeviceProcAddr>(realProc);
-        }
-        return reinterpret_cast<FARPROC>(Hooked_vkGetDeviceProcAddr);
-    }
-
-    if (std::strcmp(lpProcName, "vkQueuePresentKHR") == 0) {
-        FARPROC realProc = s_realGetProcAddress ? s_realGetProcAddress(hModule, lpProcName) : GetProcAddress(hModule, lpProcName);
-        if (realProc) {
-            s_realVkQueuePresentKHR = reinterpret_cast<PFN_vkQueuePresentKHR>(realProc);
-            VulkanHookEngine::Instance().SetOriginalQueuePresentKHR(s_realVkQueuePresentKHR);
-        }
-        return reinterpret_cast<FARPROC>(Hooked_vkQueuePresentKHR);
-    }
-
-    if (s_realGetProcAddress) {
-        return s_realGetProcAddress(hModule, lpProcName);
-    }
-    return GetProcAddress(hModule, lpProcName);
+    return false;
 }
 
-static bool HookIATInModule(HMODULE hMod) {
-    if (!hMod) return false;
+static void TryHookVulkanModule(HMODULE hVulkan) {
+    if (!hVulkan || s_hookedVulkan) return;
 
-    PIMAGE_DOS_HEADER pDosHeader = reinterpret_cast<PIMAGE_DOS_HEADER>(hMod);
-    if (pDosHeader->e_magic != IMAGE_DOS_SIGNATURE) return false;
+    MH_Initialize();
 
-    PIMAGE_NT_HEADERS pNtHeaders = reinterpret_cast<PIMAGE_NT_HEADERS>(reinterpret_cast<BYTE*>(hMod) + pDosHeader->e_lfanew);
-    if (pNtHeaders->Signature != IMAGE_NT_SIGNATURE) return false;
+    void* pPres = reinterpret_cast<void*>(GetProcAddress(hVulkan, "vkQueuePresentKHR"));
+    void* pGIPA = reinterpret_cast<void*>(GetProcAddress(hVulkan, "vkGetInstanceProcAddr"));
+    void* pGDPA = reinterpret_cast<void*>(GetProcAddress(hVulkan, "vkGetDeviceProcAddr"));
 
-    IMAGE_DATA_DIRECTORY importDir = pNtHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
-    if (importDir.VirtualAddress == 0 || importDir.Size == 0) return false;
-
-    PIMAGE_IMPORT_DESCRIPTOR pImportDesc = reinterpret_cast<PIMAGE_IMPORT_DESCRIPTOR>(reinterpret_cast<BYTE*>(hMod) + importDir.VirtualAddress);
-
-    while (pImportDesc->Name != 0) {
-        const char* szModName = reinterpret_cast<const char*>(reinterpret_cast<BYTE*>(hMod) + pImportDesc->Name);
-        
-        bool isVulkan = (_stricmp(szModName, "vulkan-1.dll") == 0);
-        bool isKernel32 = (_stricmp(szModName, "kernel32.dll") == 0 || 
-                           _strnicmp(szModName, "api-ms-win-core-libraryloader", 28) == 0);
-
-        if (isVulkan || isKernel32) {
-            DWORD thunkRva = pImportDesc->OriginalFirstThunk ? pImportDesc->OriginalFirstThunk : pImportDesc->FirstThunk;
-            PIMAGE_THUNK_DATA pOriginalThunk = reinterpret_cast<PIMAGE_THUNK_DATA>(reinterpret_cast<BYTE*>(hMod) + thunkRva);
-            PIMAGE_THUNK_DATA pFirstThunk = reinterpret_cast<PIMAGE_THUNK_DATA>(reinterpret_cast<BYTE*>(hMod) + pImportDesc->FirstThunk);
-
-            while (pOriginalThunk->u1.AddressOfData != 0) {
-                if (!(pOriginalThunk->u1.Ordinal & IMAGE_ORDINAL_FLAG)) {
-                    PIMAGE_IMPORT_BY_NAME pImportByName = reinterpret_cast<PIMAGE_IMPORT_BY_NAME>(reinterpret_cast<BYTE*>(hMod) + pOriginalThunk->u1.AddressOfData);
-                    const char* funcName = reinterpret_cast<const char*>(pImportByName->Name);
-
-                    void* hookFunc = nullptr;
-
-                    if (isVulkan) {
-                        if (std::strcmp(funcName, "vkGetInstanceProcAddr") == 0) {
-                            if (!s_realVkGetInstanceProcAddr && pFirstThunk->u1.Function != reinterpret_cast<ULONG_PTR>(Hooked_vkGetInstanceProcAddr)) {
-                                s_realVkGetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(pFirstThunk->u1.Function);
-                            }
-                            hookFunc = reinterpret_cast<void*>(Hooked_vkGetInstanceProcAddr);
-                        } else if (std::strcmp(funcName, "vkGetDeviceProcAddr") == 0) {
-                            if (!s_realVkGetDeviceProcAddr && pFirstThunk->u1.Function != reinterpret_cast<ULONG_PTR>(Hooked_vkGetDeviceProcAddr)) {
-                                s_realVkGetDeviceProcAddr = reinterpret_cast<PFN_vkGetDeviceProcAddr>(pFirstThunk->u1.Function);
-                            }
-                            hookFunc = reinterpret_cast<void*>(Hooked_vkGetDeviceProcAddr);
-                        } else if (std::strcmp(funcName, "vkQueuePresentKHR") == 0) {
-                            if (!s_realVkQueuePresentKHR && pFirstThunk->u1.Function != reinterpret_cast<ULONG_PTR>(Hooked_vkQueuePresentKHR)) {
-                                s_realVkQueuePresentKHR = reinterpret_cast<PFN_vkQueuePresentKHR>(pFirstThunk->u1.Function);
-                                VulkanHookEngine::Instance().SetOriginalQueuePresentKHR(s_realVkQueuePresentKHR);
-                            }
-                            hookFunc = reinterpret_cast<void*>(Hooked_vkQueuePresentKHR);
-                        }
-                    } else if (isKernel32) {
-                        if (std::strcmp(funcName, "GetProcAddress") == 0) {
-                            if (!s_realGetProcAddress && pFirstThunk->u1.Function != reinterpret_cast<ULONG_PTR>(Hooked_GetProcAddress)) {
-                                s_realGetProcAddress = reinterpret_cast<decltype(&GetProcAddress)>(pFirstThunk->u1.Function);
-                            }
-                            hookFunc = reinterpret_cast<void*>(Hooked_GetProcAddress);
-                        }
-                    }
-
-                    if (hookFunc && pFirstThunk->u1.Function != reinterpret_cast<ULONG_PTR>(hookFunc)) {
-                        DWORD oldProtect = 0;
-                        if (VirtualProtect(&pFirstThunk->u1.Function, sizeof(ULONG_PTR), PAGE_READWRITE, &oldProtect)) {
-                            pFirstThunk->u1.Function = reinterpret_cast<ULONG_PTR>(hookFunc);
-                            VirtualProtect(&pFirstThunk->u1.Function, sizeof(ULONG_PTR), oldProtect, &oldProtect);
-                        }
-                    }
-                }
-                pOriginalThunk++;
-                pFirstThunk++;
-            }
+    if (pPres) {
+        if (MH_CreateHook(pPres, reinterpret_cast<void*>(&Hooked_vkQueuePresentKHR), reinterpret_cast<void**>(&s_realVkQueuePresentKHR)) == MH_OK) {
+            MH_EnableHook(pPres);
+            VulkanHookEngine::Instance().SetOriginalQueuePresentKHR(s_realVkQueuePresentKHR);
         }
-        pImportDesc++;
     }
-    return true;
+    if (pGIPA) {
+        if (MH_CreateHook(pGIPA, reinterpret_cast<void*>(&Hooked_vkGetInstanceProcAddr), reinterpret_cast<void**>(&s_realVkGetInstanceProcAddr)) == MH_OK) {
+            MH_EnableHook(pGIPA);
+        }
+    }
+    if (pGDPA) {
+        if (MH_CreateHook(pGDPA, reinterpret_cast<void*>(&Hooked_vkGetDeviceProcAddr), reinterpret_cast<void**>(&s_realVkGetDeviceProcAddr)) == MH_OK) {
+            MH_EnableHook(pGDPA);
+        }
+    }
+
+    s_hookedVulkan = true;
+}
+
+static DWORD WINAPI VulkanHookScannerThread(LPVOID lpParam) {
+    for (int i = 0; i < 60; ++i) {
+        HMODULE hVulkan = GetModuleHandleW(L"vulkan-1.dll");
+        if (hVulkan && !s_hookedVulkan) {
+            TryHookVulkanModule(hVulkan);
+            break;
+        }
+        Sleep(500);
+    }
+    return 0;
 }
 
 VulkanHookEngine& VulkanHookEngine::Instance() {
@@ -199,71 +140,6 @@ VulkanHookEngine::VulkanHookEngine()
 
 VulkanHookEngine::~VulkanHookEngine() {
     Shutdown();
-}
-
-void VulkanHookEngine::HookLoadedModules() {
-    HMODULE hMods[1024];
-    DWORD cbNeeded = 0;
-    HANDLE hProcess = GetCurrentProcess();
-    
-    if (EnumProcessModules(hProcess, hMods, sizeof(hMods), &cbNeeded)) {
-        DWORD count = cbNeeded / sizeof(HMODULE);
-        for (DWORD i = 0; i < count; ++i) {
-            HookIATInModule(hMods[i]);
-        }
-    } else {
-        HookIATInModule(GetModuleHandleA(NULL));
-    }
-}
-
-static DWORD WINAPI VulkanHookScannerThread(LPVOID lpParam) {
-    MH_Initialize();
-
-    for (int i = 0; i < 240; ++i) {
-        HMODULE hVulkan = GetModuleHandleW(L"vulkan-1.dll");
-        if (hVulkan && !s_hookedVulkan) {
-            void* pPres = reinterpret_cast<void*>(GetProcAddress(hVulkan, "vkQueuePresentKHR"));
-            void* pGIPA = reinterpret_cast<void*>(GetProcAddress(hVulkan, "vkGetInstanceProcAddr"));
-            void* pGDPA = reinterpret_cast<void*>(GetProcAddress(hVulkan, "vkGetDeviceProcAddr"));
-
-            if (pPres) {
-                if (MH_CreateHook(pPres, reinterpret_cast<void*>(&Hooked_vkQueuePresentKHR), reinterpret_cast<void**>(&s_realVkQueuePresentKHR)) == MH_OK) {
-                    MH_EnableHook(pPres);
-                    VulkanHookEngine::Instance().SetOriginalQueuePresentKHR(s_realVkQueuePresentKHR);
-                }
-            }
-            if (pGIPA) {
-                if (MH_CreateHook(pGIPA, reinterpret_cast<void*>(&Hooked_vkGetInstanceProcAddr), reinterpret_cast<void**>(&s_realVkGetInstanceProcAddr)) == MH_OK) {
-                    MH_EnableHook(pGIPA);
-                }
-            }
-            if (pGDPA) {
-                if (MH_CreateHook(pGDPA, reinterpret_cast<void*>(&Hooked_vkGetDeviceProcAddr), reinterpret_cast<void**>(&s_realVkGetDeviceProcAddr)) == MH_OK) {
-                    MH_EnableHook(pGDPA);
-                }
-            }
-            s_hookedVulkan = true;
-        }
-
-        VulkanHookEngine::Instance().HookLoadedModules();
-        Sleep(250);
-    }
-    return 0;
-}
-
-static bool IsBlockedProcessName(const char* procName) {
-    if (!procName) return true;
-    char lower[128] = {};
-    for (size_t i = 0; procName[i] && i < 127; ++i) {
-        lower[i] = static_cast<char>(tolower(static_cast<unsigned char>(procName[i])));
-    }
-    if (strstr(lower, "nvidia") || strstr(lower, "overlay") || strstr(lower, "discord") ||
-        strstr(lower, "electron") || strstr(lower, "obs") || strstr(lower, "rtss") ||
-        strstr(lower, "steam") || strstr(lower, "chrome") || strstr(lower, "framepacer") ||
-        strstr(lower, "gamebar") || strstr(lower, "radeon") || strstr(lower, "overwolf")) {
-        return true;
-    }
-    return false;
 }
 
 bool VulkanHookEngine::Initialize() {
@@ -288,21 +164,13 @@ bool VulkanHookEngine::Initialize() {
     m_pacer.Initialize();
     m_pacer.SetTargetFps(60.0);
 
-    // 4. Hook initially loaded modules and resolve vulkan-1.dll
+    // 4. Hook vulkan-1.dll if present, or wait for it
     HMODULE hVulkan = GetModuleHandleW(L"vulkan-1.dll");
     if (hVulkan) {
-        s_realVkGetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(GetProcAddress(hVulkan, "vkGetInstanceProcAddr"));
-        s_realVkGetDeviceProcAddr = reinterpret_cast<PFN_vkGetDeviceProcAddr>(GetProcAddress(hVulkan, "vkGetDeviceProcAddr"));
-        s_realVkQueuePresentKHR = reinterpret_cast<PFN_vkQueuePresentKHR>(GetProcAddress(hVulkan, "vkQueuePresentKHR"));
-        if (s_realVkQueuePresentKHR) {
-            SetOriginalQueuePresentKHR(s_realVkQueuePresentKHR);
-        }
+        TryHookVulkanModule(hVulkan);
+    } else {
+        CreateThread(NULL, 0, VulkanHookScannerThread, NULL, 0, NULL);
     }
-
-    HookLoadedModules();
-
-    // 5. Spawn background hook thread to intercept modules loaded dynamically
-    CreateThread(NULL, 0, VulkanHookScannerThread, NULL, 0, NULL);
 
     m_isInitialized = true;
     return true;
@@ -388,6 +256,7 @@ VkResult VulkanHookEngine::OnQueuePresentKHR(VkQueue queue, const VkPresentInfoK
         if (uiTargetFps >= 10 && uiTargetFps <= 360 && std::abs(m_lastTargetFps - uiTargetFps) > 0.1) {
             m_lastTargetFps = uiTargetFps;
             m_pacer.SetTargetFps(m_lastTargetFps);
+            m_pacer.Reset();
         }
     }
 
