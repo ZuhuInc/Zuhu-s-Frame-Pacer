@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialize IPC Bridge
   const ipc = new IPCBridge();
+  window.ipc = ipc;
   ipc.connect();
 
   // DOM Elements
@@ -760,6 +761,35 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Graphics API & Timing Engine Toggles
+  const hookDxToggle = document.getElementById('toggle-hook-dx');
+  if (hookDxToggle) {
+    hookDxToggle.addEventListener('change', (e) => {
+      ipc.setHookDxgi(e.target.checked);
+    });
+  }
+
+  const hookVkToggle = document.getElementById('toggle-hook-vk');
+  if (hookVkToggle) {
+    hookVkToggle.addEventListener('change', (e) => {
+      ipc.setHookVulkan(e.target.checked);
+    });
+  }
+
+  const hookGlToggle = document.getElementById('toggle-hook-gl');
+  if (hookGlToggle) {
+    hookGlToggle.addEventListener('change', (e) => {
+      ipc.setHookOpengl(e.target.checked);
+    });
+  }
+
+  const hybridTimingToggle = document.getElementById('toggle-timing-hybrid');
+  if (hybridTimingToggle) {
+    hybridTimingToggle.addEventListener('change', (e) => {
+      ipc.setHybridTiming(e.target.checked);
+    });
+  }
+
   // =========================================================================
   // Display & Adaptive-Sync / VRR Engine
   // =========================================================================
@@ -1032,6 +1062,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     miniCapInput.addEventListener('blur', () => {
       commitMiniInput();
+    });
+  }
+
+  const btnSwitchProcess = document.getElementById('btn-switch-process');
+  if (btnSwitchProcess) {
+    btnSwitchProcess.addEventListener('click', () => {
+      if (windowFrame?.classList.contains('mini-mode')) {
+        btnMiniMode?.click();
+      }
+      const profilesTabActive = document.querySelector('.tab-btn[data-tab="profiles"].active');
+      const targetTab = profilesTabActive ? 'pacer' : 'profiles';
+      const targetBtn = document.querySelector(`.tab-btn[data-tab="${targetTab}"]`);
+      if (targetBtn) targetBtn.click();
+      profileManager.syncBypassedGamesWithBridge();
     });
   }
 

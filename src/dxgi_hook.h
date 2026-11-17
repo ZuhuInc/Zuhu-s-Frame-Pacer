@@ -6,6 +6,7 @@
 #include <windows.h>
 #include <d3d11.h>
 #include <dxgi1_4.h>
+#include <atomic>
 #include "timing_engine.h"
 #include "ipc_shared_memory.h"
 
@@ -54,6 +55,7 @@ public:
 
     DXGIPresent_t GetOriginalPresent() const { return m_fnOriginalPresent; }
     DXGIPresent1_t GetOriginalPresent1() const { return m_fnOriginalPresent1; }
+    bool HasPresentedFrames() const { return m_recentFrameIndex > 0; }
 
     DXGIPresent_t m_fnOriginalPresent;
     DXGIPresent1_t m_fnOriginalPresent1;
@@ -62,7 +64,8 @@ private:
     DXGIHookEngine();
     ~DXGIHookEngine();
 
-    void ApplyFrameLatencyClamp(IDXGISwapChain* pSwapChain);
+    void ApplyFrameLatencyClamp(IDXGISwapChain* pSwapChain, bool enableClamp);
+    bool PaceAndRecordFrame(IDXGISwapChain* pSwapChain, FramePacerControlBlock* pIpc);
     void UpdateTelemetry(double frameTimeMs);
 
     void** m_pSwapChainVTable;

@@ -251,6 +251,17 @@ VkResult VulkanHookEngine::OnQueuePresentKHR(VkQueue queue, const VkPresentInfoK
 
     // Sync target FPS from UI / IPC
     auto* pIpc = m_ipc.Get();
+    if (pIpc && pIpc->hook_vulkan == 0) {
+        s_inVkPresent = false;
+        if (m_fnOriginalQueuePresent) {
+            return m_fnOriginalQueuePresent(queue, pPresentInfo);
+        }
+        if (s_realVkQueuePresentKHR) {
+            return s_realVkQueuePresentKHR(queue, pPresentInfo);
+        }
+        return VK_SUCCESS;
+    }
+
     if (pIpc) {
         uint32_t uiTargetFps = pIpc->target_fps;
         if (uiTargetFps >= 10 && uiTargetFps <= 360 && std::abs(m_lastTargetFps - uiTargetFps) > 0.1) {
@@ -261,14 +272,13 @@ VkResult VulkanHookEngine::OnQueuePresentKHR(VkQueue queue, const VkPresentInfoK
     }
 
     bool pacingEnabled = pIpc ? (pIpc->pacing_enabled != 0) : true;
+    bool hybridTiming = pIpc ? (pIpc->hybrid_timing != 0) : true;
     double achievedFrametimeMs = 16.67;
 
     if (pacingEnabled) {
-        achievedFrametimeMs = m_pacer.WaitAndPace();
+        achievedFrametimeMs = m_pacer.WaitAndPace(hybridTiming);
     } else {
-        LARGE_INTEGER qpcNow;
-        QueryPerformanceCounter(&qpcNow);
-        m_pacer.Reset();
+        achievedFrametimeMs = m_pacer.MeasureUnpacedFrame();
     }
 
     UpdateTelemetry(achievedFrametimeMs);

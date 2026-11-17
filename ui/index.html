@@ -522,27 +522,30 @@
           </label>
         </div>
 
-        <div class="toggle-row" style="opacity: 0.8;">
+        <div class="toggle-row">
           <div class="toggle-info">
             <div class="toggle-title" style="display: flex; align-items: center; gap: 8px;">
               Vulkan Presentation Engine
-              <span style="font-size: 0.65rem; background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); padding: 2px 6px; border-radius: 4px; font-weight: 700; letter-spacing: 0.5px;">COMING SOON</span>
+              <span style="font-size: 0.65rem; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); padding: 2px 6px; border-radius: 4px; font-weight: 700; letter-spacing: 0.5px;">ACTIVE</span>
             </div>
-            <div class="toggle-desc">In-process vkQueuePresentKHR presentation timing (in active roadmap)</div>
+            <div class="toggle-desc">In-process vkQueuePresentKHR presentation timing</div>
           </div>
-          <label class="switch" style="opacity: 0.5; pointer-events: none;" title="Coming Soon">
-            <input type="checkbox" id="toggle-hook-vk" disabled>
+          <label class="switch">
+            <input type="checkbox" id="toggle-hook-vk" checked>
             <span class="switch-slider"></span>
           </label>
         </div>
 
         <div class="toggle-row">
           <div class="toggle-info">
-            <div class="toggle-title">OpenGL Interceptor (wglSwapBuffers)</div>
+            <div class="toggle-title" style="display: flex; align-items: center; gap: 8px;">
+              OpenGL Interceptor (wglSwapBuffers)
+              <span style="font-size: 0.65rem; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); padding: 2px 6px; border-radius: 4px; font-weight: 700; letter-spacing: 0.5px;">ACTIVE</span>
+            </div>
             <div class="toggle-desc">For classic OpenGL and emulator window backbuffers</div>
           </div>
           <label class="switch">
-            <input type="checkbox" id="toggle-hook-gl">
+            <input type="checkbox" id="toggle-hook-gl" checked>
             <span class="switch-slider"></span>
           </label>
         </div>
@@ -797,12 +800,12 @@
               <span style="font-size: 0.72rem;">dxgi.dll VTable Hook with Latency Clamping</span>
             </div>
             <div class="metric-box">
-              <strong style="color: #fbbf24;">Vulkan Native <span style="font-size: 0.65rem; font-weight: 400; opacity: 0.85;">(Coming Soon)</span></strong>
-              <span style="font-size: 0.72rem;">Roadmap &bull; vkQueuePresentKHR Pacing Engine</span>
+              <strong style="color: var(--emerald-accent);">Vulkan Native</strong>
+              <span style="font-size: 0.72rem;">vkQueuePresentKHR Pacing Engine</span>
             </div>
             <div class="metric-box">
-              <strong style="color: var(--purple-accent);">Hybrid Spin-Wait</strong>
-              <span style="font-size: 0.72rem;">High-res timer + QPC sub-millisecond precision</span>
+              <strong style="color: var(--purple-accent);">OpenGL (wglSwapBuffers)</strong>
+              <span style="font-size: 0.72rem;">wglSwapBuffers Presentation Pacing Hook</span>
             </div>
           </div>
         </div>

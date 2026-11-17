@@ -71,11 +71,19 @@ void SendWebSocketText(SOCKET sock, const std::string& text) {
     send(sock, reinterpret_cast<const char*>(frame.data()), static_cast<int>(frame.size()), 0);
 }
 
+static bool ParseBoolEnabled(const std::string& msg, bool& outEnabled) {
+    size_t enPos = msg.find("\"enabled\":");
+    if (enPos == std::string::npos) return false;
+    outEnabled = (msg.substr(enPos + 10, 4) == "true");
+    return true;
+}
+
 void ProcessWebSocketMessage(const std::string& msg, FramePacer::SharedMemoryChannel& ipc) {
     auto* pBlock = ipc.Get();
     if (!pBlock) return;
 
     // Parse simple JSON commands without external dependencies
+    bool flagVal = false;
     if (msg.find("SET_TARGET_FPS") != std::string::npos) {
         size_t fpsPos = msg.find("\"fps\":");
         if (fpsPos != std::string::npos) {
@@ -85,32 +93,24 @@ void ProcessWebSocketMessage(const std::string& msg, FramePacer::SharedMemoryCha
                 std::cout << "[Bridge] Updated Target FPS -> " << pBlock->target_fps << " FPS" << std::endl;
             }
         }
-    } else if (msg.find("SET_PACING_ENABLED") != std::string::npos) {
-        size_t enPos = msg.find("\"enabled\":");
-        if (enPos != std::string::npos) {
-            bool en = (msg.substr(enPos + 10, 4) == "true");
-            pBlock->pacing_enabled = en ? 1 : 0;
-            std::cout << "[Bridge] Pacing State -> " << (en ? "ENABLED" : "DISABLED") << std::endl;
-        }
-    } else if (msg.find("SET_QUEUE_CLAMP") != std::string::npos) {
-        size_t enPos = msg.find("\"enabled\":");
-        if (enPos != std::string::npos) {
-            bool en = (msg.substr(enPos + 10, 4) == "true");
-            pBlock->queue_depth_clamp = en ? 1 : 0;
-        }
-    } else if (msg.find("SET_AUTO_ATTACH") != std::string::npos) {
-        size_t enPos = msg.find("\"enabled\":");
-        if (enPos != std::string::npos) {
-            bool en = (msg.substr(enPos + 10, 4) == "true");
-            FramePacer::GameWatcher::Instance().SetEnabled(en);
-        }
-    } else if (msg.find("SET_OVERLAY_ENABLED") != std::string::npos) {
-        size_t enPos = msg.find("\"enabled\":");
-        if (enPos != std::string::npos) {
-            bool en = (msg.substr(enPos + 10, 4) == "true");
-            pBlock->overlay_enabled = en ? 1 : 0;
-            std::cout << "[Bridge] Overlay State -> " << (en ? "ENABLED" : "DISABLED") << std::endl;
-        }
+    } else if (msg.find("SET_PACING_ENABLED") != std::string::npos && ParseBoolEnabled(msg, flagVal)) {
+        pBlock->pacing_enabled = flagVal ? 1 : 0;
+        std::cout << "[Bridge] Pacing State -> " << (flagVal ? "ENABLED" : "DISABLED") << std::endl;
+    } else if (msg.find("SET_QUEUE_CLAMP") != std::string::npos && ParseBoolEnabled(msg, flagVal)) {
+        pBlock->queue_depth_clamp = flagVal ? 1 : 0;
+    } else if (msg.find("SET_HOOK_DXGI") != std::string::npos && ParseBoolEnabled(msg, flagVal)) {
+        pBlock->hook_dxgi = flagVal ? 1 : 0;
+    } else if (msg.find("SET_HOOK_VULKAN") != std::string::npos && ParseBoolEnabled(msg, flagVal)) {
+        pBlock->hook_vulkan = flagVal ? 1 : 0;
+    } else if (msg.find("SET_HOOK_OPENGL") != std::string::npos && ParseBoolEnabled(msg, flagVal)) {
+        pBlock->hook_opengl = flagVal ? 1 : 0;
+    } else if (msg.find("SET_HYBRID_TIMING") != std::string::npos && ParseBoolEnabled(msg, flagVal)) {
+        pBlock->hybrid_timing = flagVal ? 1 : 0;
+    } else if (msg.find("SET_AUTO_ATTACH") != std::string::npos && ParseBoolEnabled(msg, flagVal)) {
+        FramePacer::GameWatcher::Instance().SetEnabled(flagVal);
+    } else if (msg.find("SET_OVERLAY_ENABLED") != std::string::npos && ParseBoolEnabled(msg, flagVal)) {
+        pBlock->overlay_enabled = flagVal ? 1 : 0;
+        std::cout << "[Bridge] Overlay State -> " << (flagVal ? "ENABLED" : "DISABLED") << std::endl;
     } else if (msg.find("SET_OVERLAY_POSITION") != std::string::npos) {
         size_t posVal = msg.find("\"position\":");
         if (posVal != std::string::npos) {
@@ -228,42 +228,35 @@ void HandleClient(SOCKET clientSock) {
             float fps = pBlock->current_fps;
             float ft = pBlock->current_frametime_ms;
             float jitter = pBlock->jitter_us;
+            float low1Pct = pBlock->low_1_percent_fps;
 
             // Verify if process_id is still a live running game process
             if (activePid > 0) {
                 HANDLE hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, activePid);
+                bool alive = false;
                 if (hProc) {
                     DWORD exitCode = 0;
-                    if (GetExitCodeProcess(hProc, &exitCode) && exitCode != STILL_ACTIVE) {
-                        // Game process terminated
-                        pBlock->process_id = 0;
-                        pBlock->process_name[0] = '\0';
-                        pBlock->api_name[0] = '\0';
-                        pBlock->current_fps = 0.0f;
-                        pBlock->current_frametime_ms = 0.0f;
-                        pBlock->jitter_us = 0.0f;
-                        activePid = 0;
-                        procName = "";
-                        apiName = "";
-                        fps = 0.0f;
-                        ft = 0.0f;
-                        jitter = 0.0f;
+                    if (GetExitCodeProcess(hProc, &exitCode) && exitCode == STILL_ACTIVE) {
+                        alive = true;
                     }
                     CloseHandle(hProc);
-                } else {
-                    // Cannot open PID -> Process no longer exists
+                }
+                if (!alive) {
+                    // Game process terminated or no longer exists
                     pBlock->process_id = 0;
                     pBlock->process_name[0] = '\0';
                     pBlock->api_name[0] = '\0';
                     pBlock->current_fps = 0.0f;
                     pBlock->current_frametime_ms = 0.0f;
                     pBlock->jitter_us = 0.0f;
+                    pBlock->low_1_percent_fps = 0.0f;
                     activePid = 0;
                     procName = "";
                     apiName = "";
                     fps = 0.0f;
                     ft = 0.0f;
                     jitter = 0.0f;
+                    low1Pct = 0.0f;
                 }
             }
 
@@ -275,6 +268,7 @@ void HandleClient(SOCKET clientSock) {
                  << "\"fps\":" << fps << ","
                  << "\"frametime\":" << ft << ","
                  << "\"jitter\":" << jitter << ","
+                 << "\"low1PercentFps\":" << low1Pct << ","
                  << "\"targetFps\":" << pBlock->target_fps << ","
                  << "\"pacingEnabled\":" << (pBlock->pacing_enabled != 0 ? "true" : "false") << ","
                  << "\"overlayEnabled\":" << (pBlock->overlay_enabled != 0 ? "true" : "false") << ","

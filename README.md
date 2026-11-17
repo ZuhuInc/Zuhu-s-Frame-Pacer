@@ -154,8 +154,8 @@ FramePacer/
 - [x] Per-game custom profiles & auto-saving library
 - [x] Adaptive-Sync / VRR Display Detection & Auto-Calibration
 - [x] Lossless Scaling & Frame Generation sync multipliers
-- [ ] In-process Native Vulkan (`vkQueuePresentKHR`) engine
-- [ ] Steam Deck / Windows Handheld auto-TDP synchronization
+- [x] In-process Native Vulkan (`vkQueuePresentKHR`) engine
+- [x] Native OpenGL (`wglSwapBuffers`) presentation hook
 
 ---
 

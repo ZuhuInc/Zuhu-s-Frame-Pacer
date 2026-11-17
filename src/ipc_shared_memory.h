@@ -25,6 +25,10 @@ struct FramePacerControlBlock {
     uint32_t vrr_mode_enabled;      // 1 = VRR Mode
     uint32_t overlay_enabled;       // 1 = In-game overlay active, 0 = hidden
     uint32_t overlay_position;      // 0 = Top-Left, 1 = Top-Right, 2 = Bottom-Left, 3 = Bottom-Right
+    uint32_t hook_dxgi;             // 1 = DXGI hook enabled, 0 = passthrough
+    uint32_t hook_vulkan;           // 1 = Vulkan hook enabled, 0 = passthrough
+    uint32_t hook_opengl;           // 1 = OpenGL hook enabled, 0 = passthrough
+    uint32_t hybrid_timing;         // 1 = Hybrid WaitableTimer + Spin-Wait, 0 = Pure Spin-Wait
     
     // Telemetry from Hook DLL -> UI
     uint32_t process_id;            // Injected game PID
@@ -92,15 +96,19 @@ public:
             return false;
         }
 
-        if (m_pControlBlock->magic != IPC_MAGIC) {
+        if (m_pControlBlock->magic != IPC_MAGIC || m_pControlBlock->version != 2) {
             m_pControlBlock->magic = IPC_MAGIC;
-            m_pControlBlock->version = 1;
+            m_pControlBlock->version = 2;
             m_pControlBlock->target_fps = 60;
             m_pControlBlock->pacing_enabled = 1;
             m_pControlBlock->queue_depth_clamp = 1;
             m_pControlBlock->vrr_mode_enabled = 1;
             m_pControlBlock->overlay_enabled = 1;
             m_pControlBlock->overlay_position = 0; // Top-Left default
+            m_pControlBlock->hook_dxgi = 1;
+            m_pControlBlock->hook_vulkan = 1;
+            m_pControlBlock->hook_opengl = 1;
+            m_pControlBlock->hybrid_timing = 1;
         }
 
         return true;

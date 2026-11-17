@@ -4,6 +4,8 @@
 #include <cmath>
 #include <numeric>
 #include <vector>
+#include <algorithm>
+#include <functional>
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -197,16 +199,17 @@ bool DXGIHookEngine::HookVTableMethod(void** ppVTable, int index, void* pNewFunc
     return false;
 }
 
-void DXGIHookEngine::ApplyFrameLatencyClamp(IDXGISwapChain* pSwapChain) {
-    if (m_latencyClamped || !pSwapChain) return;
+void DXGIHookEngine::ApplyFrameLatencyClamp(IDXGISwapChain* pSwapChain, bool enableClamp) {
+    if (!pSwapChain || m_latencyClamped == enableClamp) return;
+
+    UINT targetLatency = enableClamp ? 1 : 3;
 
     ID3D11Device* pDevice = nullptr;
     if (SUCCEEDED(pSwapChain->GetDevice(__uuidof(ID3D11Device), reinterpret_cast<void**>(&pDevice)))) {
         IDXGIDevice1* pDXGIDevice = nullptr;
         if (SUCCEEDED(pDevice->QueryInterface(__uuidof(IDXGIDevice1), reinterpret_cast<void**>(&pDXGIDevice)))) {
-            pDXGIDevice->SetMaximumFrameLatency(1);
+            pDXGIDevice->SetMaximumFrameLatency(targetLatency);
             pDXGIDevice->Release();
-            m_latencyClamped = true;
         }
         pDevice->Release();
     }
@@ -214,10 +217,11 @@ void DXGIHookEngine::ApplyFrameLatencyClamp(IDXGISwapChain* pSwapChain) {
     // Direct DXGI 1.3 Latency Clamping
     IDXGISwapChain2* pSwapChain2 = nullptr;
     if (SUCCEEDED(pSwapChain->QueryInterface(__uuidof(IDXGISwapChain2), reinterpret_cast<void**>(&pSwapChain2)))) {
-        pSwapChain2->SetMaximumFrameLatency(1);
+        pSwapChain2->SetMaximumFrameLatency(targetLatency);
         pSwapChain2->Release();
-        m_latencyClamped = true;
     }
+
+    m_latencyClamped = enableClamp;
 }
 
 void DXGIHookEngine::UpdateTelemetry(double frameTimeMs) {
@@ -233,44 +237,51 @@ void DXGIHookEngine::UpdateTelemetry(double frameTimeMs) {
         m_pacer.SetTargetFps(m_lastTargetFps);
     }
 
+    uint32_t count = (std::min)(m_recentFrameIndex, IPC_HISTORY_SIZE);
+    float sum = 0.0f;
+    for (uint32_t i = 0; i < count; ++i) sum += m_recentFrames[i];
+    float mean = sum / count;
+    float currentFps = (mean > 0.001f) ? (1000.0f / mean) : 0.0f;
+
+    // Compute standard deviation (jitter)
+    float varSum = 0.0f;
+    for (uint32_t i = 0; i < count; ++i) {
+        varSum += (m_recentFrames[i] - mean) * (m_recentFrames[i] - mean);
+    }
+    float stdDevMs = std::sqrt(varSum / count);
+    float jitterUs = stdDevMs * 1000.0f;
+
+    // 1% Low FPS computation
+    std::vector<float> sortedFrames(m_recentFrames, m_recentFrames + count);
+    std::sort(sortedFrames.begin(), sortedFrames.end(), std::greater<float>());
+    size_t idx1Percent = static_cast<size_t>(count * 0.01);
+    float low1PercentMs = sortedFrames[idx1Percent];
+    float low1PercentFps = (low1PercentMs > 0.001f) ? (1000.0f / low1PercentMs) : 0.0f;
+
     // Write live game telemetry
     pIpc->process_id = m_processId;
     std::strncpy(pIpc->process_name, m_processName, sizeof(pIpc->process_name) - 1);
     std::strncpy(pIpc->api_name, "DirectX 11/12 (DXGI)", sizeof(pIpc->api_name) - 1);
-    
+
     pIpc->current_frametime_ms = static_cast<float>(frameTimeMs);
-    pIpc->current_fps = (frameTimeMs > 0.1) ? static_cast<float>(1000.0 / frameTimeMs) : 0.0f;
+    pIpc->current_fps = currentFps;
+    pIpc->jitter_us = jitterUs;
+    pIpc->low_1_percent_fps = low1PercentFps;
     pIpc->frame_index = m_recentFrameIndex;
 
-    // Compute standard deviation (jitter)
-    uint32_t count = (m_recentFrameIndex < IPC_HISTORY_SIZE) ? m_recentFrameIndex : IPC_HISTORY_SIZE;
-    if (count > 0) {
-        float sum = 0.0f;
-        for (uint32_t i = 0; i < count; ++i) sum += m_recentFrames[i];
-        float mean = sum / count;
-
-        float varSum = 0.0f;
-        for (uint32_t i = 0; i < count; ++i) {
-            varSum += (m_recentFrames[i] - mean) * (m_recentFrames[i] - mean);
-        }
-        float stdDevMs = std::sqrt(varSum / count);
-        pIpc->jitter_us = stdDevMs * 1000.0f;
+    // Copy ring buffer for oscilloscope
+    for (uint32_t i = 0; i < IPC_HISTORY_SIZE; ++i) {
+        uint32_t srcIdx = (m_recentFrameIndex + i) % IPC_HISTORY_SIZE;
+        pIpc->frametime_history[i] = m_recentFrames[srcIdx];
     }
 }
 
-HRESULT DXGIHookEngine::OnPresent(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT Flags) {
-    thread_local bool s_inPresent = false;
-    if (s_inPresent) {
-        if (m_fnOriginalPresent) return m_fnOriginalPresent(pSwapChain, SyncInterval, Flags);
-        return S_OK;
-    }
-    s_inPresent = true;
+static thread_local bool s_inDxgiPresent = false;
 
-    if (!m_latencyClamped) {
-        ApplyFrameLatencyClamp(pSwapChain);
-    }
+bool DXGIHookEngine::PaceAndRecordFrame(IDXGISwapChain* pSwapChain, FramePacerControlBlock* pIpc) {
+    bool clampEnabled = pIpc ? (pIpc->queue_depth_clamp != 0) : true;
+    ApplyFrameLatencyClamp(pSwapChain, clampEnabled);
 
-    FramePacerControlBlock* pIpc = m_ipc.Get();
     if (pIpc && pIpc->target_fps > 0 && pIpc->target_fps != m_lastTargetFps) {
         m_lastTargetFps = pIpc->target_fps;
         m_pacer.SetTargetFps(m_lastTargetFps);
@@ -278,15 +289,27 @@ HRESULT DXGIHookEngine::OnPresent(IDXGISwapChain* pSwapChain, UINT SyncInterval,
     }
 
     bool pacingActive = pIpc ? (pIpc->pacing_enabled != 0) : true;
+    bool hybridTiming = pIpc ? (pIpc->hybrid_timing != 0) : true;
 
-    double frameTimeMs = 0.0;
-    if (pacingActive) {
-        frameTimeMs = m_pacer.WaitAndPace();
-    } else {
-        frameTimeMs = m_pacer.MeasureUnpacedFrame();
+    double frameTimeMs = pacingActive ? m_pacer.WaitAndPace(hybridTiming) : m_pacer.MeasureUnpacedFrame();
+    UpdateTelemetry(frameTimeMs);
+    return pacingActive;
+}
+
+HRESULT DXGIHookEngine::OnPresent(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT Flags) {
+    if ((Flags & DXGI_PRESENT_TEST) || s_inDxgiPresent) {
+        if (m_fnOriginalPresent) return m_fnOriginalPresent(pSwapChain, SyncInterval, Flags);
+        return S_OK;
     }
 
-    UpdateTelemetry(frameTimeMs);
+    FramePacerControlBlock* pIpc = m_ipc.Get();
+    if (pIpc && pIpc->hook_dxgi == 0) {
+        if (m_fnOriginalPresent) return m_fnOriginalPresent(pSwapChain, SyncInterval, Flags);
+        return S_OK;
+    }
+
+    s_inDxgiPresent = true;
+    bool pacingActive = PaceAndRecordFrame(pSwapChain, pIpc);
 
     HRESULT hr = S_OK;
     if (m_fnOriginalPresent) {
@@ -294,39 +317,24 @@ HRESULT DXGIHookEngine::OnPresent(IDXGISwapChain* pSwapChain, UINT SyncInterval,
         hr = m_fnOriginalPresent(pSwapChain, effectiveSyncInterval, Flags);
     }
 
-    s_inPresent = false;
+    s_inDxgiPresent = false;
     return hr;
 }
 
 HRESULT DXGIHookEngine::OnPresent1(IDXGISwapChain1* pSwapChain, UINT SyncInterval, UINT Flags, const DXGI_PRESENT_PARAMETERS* pPresentParameters) {
-    thread_local bool s_inPresent1 = false;
-    if (s_inPresent1) {
+    if ((Flags & DXGI_PRESENT_TEST) || s_inDxgiPresent) {
         if (m_fnOriginalPresent1) return m_fnOriginalPresent1(pSwapChain, SyncInterval, Flags, pPresentParameters);
         return S_OK;
     }
-    s_inPresent1 = true;
-
-    if (!m_latencyClamped) {
-        ApplyFrameLatencyClamp(pSwapChain);
-    }
 
     FramePacerControlBlock* pIpc = m_ipc.Get();
-    if (pIpc && pIpc->target_fps > 0 && pIpc->target_fps != m_lastTargetFps) {
-        m_lastTargetFps = pIpc->target_fps;
-        m_pacer.SetTargetFps(m_lastTargetFps);
-        m_pacer.Reset();
+    if (pIpc && pIpc->hook_dxgi == 0) {
+        if (m_fnOriginalPresent1) return m_fnOriginalPresent1(pSwapChain, SyncInterval, Flags, pPresentParameters);
+        return S_OK;
     }
 
-    bool pacingActive = pIpc ? (pIpc->pacing_enabled != 0) : true;
-
-    double frameTimeMs = 0.0;
-    if (pacingActive) {
-        frameTimeMs = m_pacer.WaitAndPace();
-    } else {
-        frameTimeMs = m_pacer.MeasureUnpacedFrame();
-    }
-
-    UpdateTelemetry(frameTimeMs);
+    s_inDxgiPresent = true;
+    bool pacingActive = PaceAndRecordFrame(pSwapChain, pIpc);
 
     HRESULT hr = S_OK;
     if (m_fnOriginalPresent1) {
@@ -334,7 +342,7 @@ HRESULT DXGIHookEngine::OnPresent1(IDXGISwapChain1* pSwapChain, UINT SyncInterva
         hr = m_fnOriginalPresent1(pSwapChain, effectiveSyncInterval, Flags, pPresentParameters);
     }
 
-    s_inPresent1 = false;
+    s_inDxgiPresent = false;
     return hr;
 }
 

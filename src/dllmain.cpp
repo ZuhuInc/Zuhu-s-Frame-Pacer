@@ -1,6 +1,7 @@
 #include <windows.h>
 #include "dxgi_hook.h"
 #include "vulkan_hook.h"
+#include "opengl_hook.h"
 
 DWORD WINAPI HookInitThread(LPVOID lpParam) {
     // Safety delay to allow game's DirectX 11/12 graphics engine and command queues to stabilize
@@ -14,6 +15,9 @@ DWORD WINAPI HookInitThread(LPVOID lpParam) {
         if (GetModuleHandleW(L"vulkan-1.dll") != NULL) {
             FramePacer::VulkanHookEngine::Instance().Initialize();
         }
+
+        // Initialize OpenGL presentation hook (hooks opengl32.dll!wglSwapBuffers when present)
+        FramePacer::OpenGLHookEngine::Instance().Initialize();
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {
         // Safely catch any initialization anomalies in protected games
@@ -32,6 +36,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
         __try {
             FramePacer::DXGIHookEngine::Instance().Shutdown();
             FramePacer::VulkanHookEngine::Instance().Shutdown();
+            FramePacer::OpenGLHookEngine::Instance().Shutdown();
         }
         __except (EXCEPTION_EXECUTE_HANDLER) {
         }

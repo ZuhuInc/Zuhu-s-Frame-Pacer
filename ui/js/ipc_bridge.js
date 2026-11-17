@@ -17,7 +17,11 @@ class IPCBridge {
       pacingEnabled: true,
       queueDepthClamp: true,
       vrrMode: true,
-      overlayEnabled: true
+      overlayEnabled: true,
+      hookDxgi: true,
+      hookVulkan: true,
+      hookOpengl: true,
+      hybridTiming: true
     };
 
     this.listeners = [];
@@ -95,6 +99,26 @@ class IPCBridge {
     this.send("SET_QUEUE_CLAMP", { enabled });
   }
 
+  setHookDxgi(enabled) {
+    this.settings.hookDxgi = enabled;
+    this.send("SET_HOOK_DXGI", { enabled });
+  }
+
+  setHookVulkan(enabled) {
+    this.settings.hookVulkan = enabled;
+    this.send("SET_HOOK_VULKAN", { enabled });
+  }
+
+  setHookOpengl(enabled) {
+    this.settings.hookOpengl = enabled;
+    this.send("SET_HOOK_OPENGL", { enabled });
+  }
+
+  setHybridTiming(enabled) {
+    this.settings.hybridTiming = enabled;
+    this.send("SET_HYBRID_TIMING", { enabled });
+  }
+
   setAutoAttach(enabled) {
     this.send("SET_AUTO_ATTACH", { enabled });
   }
@@ -116,7 +140,12 @@ class IPCBridge {
   syncSettings() {
     this.setTargetFps(this.settings.targetFps);
     this.setPacingEnabled(this.settings.pacingEnabled);
+    this.setQueueDepthClamp(this.settings.queueDepthClamp);
     this.setOverlayEnabled(this.settings.overlayEnabled);
+    this.setHookDxgi(this.settings.hookDxgi);
+    this.setHookVulkan(this.settings.hookVulkan);
+    this.setHookOpengl(this.settings.hookOpengl);
+    this.setHybridTiming(this.settings.hybridTiming);
   }
 }
 

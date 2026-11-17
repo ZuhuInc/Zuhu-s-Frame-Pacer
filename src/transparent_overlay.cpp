@@ -149,7 +149,24 @@ public:
         DWORD fgPid = 0;
         GetWindowThreadProcessId(fgWnd, &fgPid);
 
-        if (fgPid != pIpc->process_id) {
+        bool isGameForeground = (fgPid == pIpc->process_id);
+        if (!isGameForeground && pIpc->process_name[0] != '\0') {
+            HANDLE hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, fgPid);
+            if (hProc) {
+                char fgPath[MAX_PATH] = {};
+                DWORD sz = MAX_PATH;
+                if (QueryFullProcessImageNameA(hProc, 0, fgPath, &sz)) {
+                    const char* pSlash = strrchr(fgPath, '\\');
+                    const char* baseName = pSlash ? pSlash + 1 : fgPath;
+                    if (_stricmp(baseName, pIpc->process_name) == 0) {
+                        isGameForeground = true;
+                    }
+                }
+                CloseHandle(hProc);
+            }
+        }
+
+        if (!isGameForeground) {
             // User alt-tabbed to desktop, browser, discord, etc. -> Hide overlay
             ShowWindow(m_hWnd, SW_HIDE);
             return;
@@ -192,7 +209,7 @@ public:
                 break;
         }
 
-        SetWindowPos(m_hWnd, HWND_TOPMOST, posX, posY, m_overlayWidth, m_overlayHeight, SWP_NOACTIVATE | SWP_NOSIZE);
+        SetWindowPos(m_hWnd, HWND_TOPMOST, posX, posY, m_overlayWidth, m_overlayHeight, SWP_NOACTIVATE | SWP_NOSIZE | SWP_SHOWWINDOW);
         ShowWindow(m_hWnd, SW_SHOWNOACTIVATE);
 
         // Read Live Telemetry

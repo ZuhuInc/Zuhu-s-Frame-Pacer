@@ -86,7 +86,7 @@ public:
      * and advances the target schedule for the next frame.
      * @return The actual achieved frametime in milliseconds since previous present.
      */
-    double WaitAndPace() {
+    double WaitAndPace(bool useHybridSleep = true) {
         LARGE_INTEGER qpcNow;
         QueryPerformanceCounter(&qpcNow);
         int64_t now = qpcNow.QuadPart;
@@ -98,7 +98,7 @@ public:
 
         // 1. Coarse Sleep Phase using High-Resolution Waitable Timer
         int64_t remainingTicks = m_nextTargetQpc - now;
-        if (remainingTicks > m_spinYieldThresholdQpc && m_hWaitableTimer != NULL) {
+        if (useHybridSleep && remainingTicks > m_spinYieldThresholdQpc && m_hWaitableTimer != NULL) {
             int64_t sleepTicks = remainingTicks - m_spinYieldThresholdQpc;
             
             // Convert QPC ticks to 100-nanosecond intervals (negative value = relative time)

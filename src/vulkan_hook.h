@@ -88,6 +88,8 @@ public:
         return m_fnOriginalQueuePresent;
     }
 
+    bool HasPresentedFrames() const { return m_recentFrameIndex > 0; }
+
 private:
     VulkanHookEngine();
     ~VulkanHookEngine();
